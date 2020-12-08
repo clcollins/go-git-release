@@ -29,11 +29,10 @@ import (
 var name string = "Chris Collins"
 var email string = "collins.christopher@gmail.com"
 
-const projectURL string = "git@github.com:clcollins/osd-utils-cli.git"
-
 var cfgFile string
 var verbose bool
 var privateKey string
+var repositoryURL string
 var remote string
 var tag string
 var home string
@@ -97,13 +96,16 @@ func init() {
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "enable verbose output")
 
 	// Path to private key; defaults to "id_rsa"
-	rootCmd.PersistentFlags().StringVarP(&privateKey, "private-key", "k", "id_rsa", "SSH private key to use for authentication")
+	rootCmd.PersistentFlags().StringVarP(&privateKey, "privateKey", "k", "id_rsa", "SSH private key to use for authentication")
 
 	// Name of git remote to tag/push/release; "defaults to upstream"
-	rootCmd.PersistentFlags().StringVarP(&remote, "remote", "r", "upstream", "git remote to act on")
+	rootCmd.PersistentFlags().StringVarP(&remote, "remote", "R", "upstream", "git remote to act on")
 
 	// Tag name; required
 	rootCmd.PersistentFlags().StringVarP(&tag, "tag", "t", "", "tag to create or use for the release")
+
+	// Repository; required
+	rootCmd.PersistentFlags().StringVarP(&repositoryURL, "repositoryURL", "r", "", "repository url")
 }
 
 // initConfig reads in config file and ENV variables if set.

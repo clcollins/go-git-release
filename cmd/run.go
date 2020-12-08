@@ -227,7 +227,7 @@ func run() error {
 	// Cleanup tempDir
 	defer os.Remove(tempDir)
 
-	repo, err := cloneRepo(projectURL, tempDir)
+	repo, err := cloneRepo(repositoryURL, tempDir)
 
 	if err != nil {
 		return fmt.Errorf("cannot clone repository: %s", err)
