@@ -33,9 +33,11 @@ var cfgFile string
 var verbose bool
 var privateKey string
 var repositoryURL string
-var remote string
 var tag string
 var home string
+
+// See below - does this need to be a cli flag?
+var remote string = "origin"
 
 // gitopts holds config info for git operations
 // and is parsed during init for package cmd
@@ -99,7 +101,9 @@ func init() {
 	rootCmd.PersistentFlags().StringVarP(&privateKey, "privateKey", "k", "id_rsa", "SSH private key to use for authentication")
 
 	// Name of git remote to tag/push/release; "defaults to upstream"
-	rootCmd.PersistentFlags().StringVarP(&remote, "remote", "R", "upstream", "git remote to act on")
+	// Do we need this? If we're cloning the repo to a temp dir, it'll always be "origin".
+	// Or do we want to act on a clone in the cwd?
+	// rootCmd.PersistentFlags().StringVarP(&remote, "remote", "R", "upstream", "git remote to act on")
 
 	// Tag name; required
 	rootCmd.PersistentFlags().StringVarP(&tag, "tag", "t", "", "tag to create or use for the release")

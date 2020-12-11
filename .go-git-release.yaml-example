@@ -1,0 +1,13 @@
+---
+# These options correspond to cli flags
+# and can alternatively be provided via the cli
+#
+# The repository to act on. Must be in the form git@github.com...
+repositoryURL: git@github.com:<organization>/<repo>.git
+
+# Set verbosity output, if desired
+verbose: true
+
+# Which private key to use for authentication.  Must be in the ".ssh/" directory of the user's homedir
+privateKey: id_ed25519
+

@@ -204,7 +204,7 @@ func pushTags(repo *git.Repository) error {
 	if err != nil {
 		if err == git.NoErrAlreadyUpToDate {
 			if verbose {
-				fmt.Println("remote origin already up to date")
+				fmt.Printf("remote %s already up to date\n", remote)
 			}
 			return nil
 		}
