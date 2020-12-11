@@ -1,3 +1,4 @@
 .vscode/
 *-bak
 *-backup
+.go-git-release.yaml
