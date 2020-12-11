@@ -221,7 +221,7 @@ func run() error {
 	tempDir, err := createTempDir()
 
 	if err != nil {
-		return fmt.Errorf("cannot create temporary file: %s", err)
+		return fmt.Errorf("cannot create temporary directory: %s", err)
 	}
 
 	// Cleanup tempDir

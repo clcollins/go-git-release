@@ -121,9 +121,9 @@ func initConfig() {
 			os.Exit(1)
 		}
 
-		// Search config in home directory with name ".go-git-release" (without extension).
+		// Search config in current directory with name ".go-git-release.yaml"
 		viper.AddConfigPath(dir)
-		viper.SetConfigName(".go-git-release")
+		viper.SetConfigName(".go-git-release.yaml")
 	}
 
 	viper.AutomaticEnv() // read in environment variables that match
