@@ -72,6 +72,13 @@ a single command. At the moment, a Makefile with a "build" target is required.`,
 		tag = viper.GetString("tag")
 		repositoryURL = viper.GetString("repositoryURL")
 
+		err := validate()
+		if err != nil {
+			fmt.Printf("Error: %s\n\n", err)
+			cmd.Help()
+			os.Exit(1)
+		}
+
 		// Set git to write to stdout for verbose output
 		if verbose {
 			gitopts.progress = os.Stdout
@@ -162,4 +169,19 @@ func initConfig() {
 	if err := viper.ReadInConfig(); err == nil {
 		fmt.Println("Using config file:", viper.ConfigFileUsed())
 	}
+}
+
+func validate() error {
+	m := map[string]string{
+		"repositoryURL": repositoryURL,
+		"tag":           tag,
+	}
+
+	for k, v := range m {
+		if v == "" {
+			return fmt.Errorf("%s is required", k)
+		}
+	}
+
+	return nil
 }
