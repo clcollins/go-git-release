@@ -13,6 +13,8 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+
+// Package cmd is the main cobra command package
 package cmd
 
 import (
@@ -176,7 +178,6 @@ func setTag(repo *git.Repository, tag string, tagger *object.Signature) (bool, e
 	return true, nil
 }
 
-// TODO: Replace this with a templated signature?
 func defaultSignature(name, email string) *object.Signature {
 	return &object.Signature{
 		Name:  name,
@@ -203,6 +204,7 @@ func pushTags(repo *git.Repository) error {
 
 	if err != nil {
 		if err == git.NoErrAlreadyUpToDate {
+			// TODO cmdConfig.Verbose
 			if verbose {
 				fmt.Printf("remote %s already up to date\n", remote)
 			}
@@ -213,11 +215,9 @@ func pushTags(repo *git.Repository) error {
 	}
 
 	return nil
-
 }
 
 func run() error {
-
 	tempDir, err := createTempDir()
 
 	if err != nil {
@@ -232,6 +232,13 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("cannot clone repository: %s", err)
 	}
+
+	repoConfig, err := repo.ConfigScoped(config.GlobalScope)
+
+	fmt.Printf(repoConfig.Author.Name)
+	fmt.Printf(repoConfig.Author.Email)
+
+	os.Exit(1)
 
 	tagged, err := setTag(repo, tag, defaultSignature(name, email))
 

@@ -55,6 +55,24 @@ var rootCmd = &cobra.Command{
 a single command. At the moment, a Makefile with a "build" target is required.`,
 
 	PreRun: func(cmd *cobra.Command, args []string) {
+		// Parse viper flags
+		cfg := viper.AllSettings()
+
+		// Show the input if verbose
+		if verbose {
+			fmt.Println("Using settings:")
+			for k, v := range cfg {
+				fmt.Printf("\t%v: %v\n", k, v)
+			}
+			fmt.Printf("\n")
+		}
+
+		verbose = viper.GetBool("verbose")
+		privateKey = viper.GetString("privateKey")
+		tag = viper.GetString("tag")
+		repositoryURL = viper.GetString("repositoryURL")
+
+		// Set git to write to stdout for verbose output
 		if verbose {
 			gitopts.progress = os.Stdout
 		}
@@ -112,6 +130,12 @@ func init() {
 
 	// Repository; required
 	rootCmd.PersistentFlags().StringVarP(&repositoryURL, "repositoryURL", "r", "", "repository url")
+
+	viper.BindPFlag("verbose", rootCmd.PersistentFlags().Lookup("verbose"))
+	viper.BindPFlag("privateKey", rootCmd.PersistentFlags().Lookup("privateKey"))
+	viper.BindPFlag("tag", rootCmd.PersistentFlags().Lookup("tag"))
+	viper.BindPFlag("repositoryURL", rootCmd.PersistentFlags().Lookup("repositoryURL"))
+
 }
 
 // initConfig reads in config file and ENV variables if set.
@@ -135,7 +159,7 @@ func initConfig() {
 	viper.AutomaticEnv() // read in environment variables that match
 
 	// If a config file is found, read it in.
-	if err := viper.ReadInConfig(); err == nil && verbose {
+	if err := viper.ReadInConfig(); err == nil {
 		fmt.Println("Using config file:", viper.ConfigFileUsed())
 	}
 }
