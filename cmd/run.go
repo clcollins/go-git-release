@@ -204,7 +204,6 @@ func pushTags(repo *git.Repository) error {
 
 	if err != nil {
 		if err == git.NoErrAlreadyUpToDate {
-			// TODO cmdConfig.Verbose
 			if verbose {
 				fmt.Printf("remote %s already up to date\n", remote)
 			}
@@ -235,12 +234,20 @@ func run() error {
 
 	repoConfig, err := repo.ConfigScoped(config.GlobalScope)
 
-	fmt.Printf(repoConfig.Author.Name)
-	fmt.Printf(repoConfig.Author.Email)
+	fmt.Printf("%+v\n", repoConfig)
+	fmt.Println(repoConfig.User.Name)
+	fmt.Println(repoConfig.User.Email)
 
 	os.Exit(1)
 
-	tagged, err := setTag(repo, tag, defaultSignature(name, email))
+	tagged, err := setTag(
+		repo,
+		tag,
+		defaultSignature(
+			repoConfig.User.Name,
+			repoConfig.User.Email,
+		),
+	)
 
 	if err != nil {
 		return fmt.Errorf("failed creating tag: %s", err)
