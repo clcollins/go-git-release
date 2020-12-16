@@ -164,9 +164,27 @@ func setTag(repo *git.Repository, tag string, tagger *object.Signature) (bool, e
 		return false, err
 	}
 
+	message := fmt.Sprintf("Creating tag %s", tag) // This is the message to update with the prompt
+
 	createOpts := &git.CreateTagOptions{
 		Tagger:  tagger,
-		Message: tag,
+		Message: message,
+	}
+
+	if verbose {
+		fmt.Printf(
+			"\ntag %s\n"+
+				"Tagger: %s <%s>\n"+
+				"Date:   %s\n"+
+				"\n"+
+				"%s\n"+
+				"\n",
+			tag,
+			tagger.Name,
+			tagger.Email,
+			tagger.When,
+			message,
+		)
 	}
 
 	_, err = repo.CreateTag(tag, head.Hash(), createOpts)
@@ -196,7 +214,7 @@ func pushTags(repo *git.Repository) error {
 	pushOpts := &git.PushOptions{
 		RemoteName: remote,
 		Progress:   gitopts.progress,
-		RefSpecs:   []config.RefSpec{config.RefSpec("reft/tags/*:refs/tags/*")},
+		RefSpecs:   []config.RefSpec{config.RefSpec("refs/tags/*:refs/tags/*")},
 		Auth:       auth,
 	}
 
@@ -233,12 +251,6 @@ func run() error {
 	}
 
 	repoConfig, err := repo.ConfigScoped(config.GlobalScope)
-
-	fmt.Printf("%+v\n", repoConfig)
-	fmt.Println(repoConfig.User.Name)
-	fmt.Println(repoConfig.User.Email)
-
-	os.Exit(1)
 
 	tagged, err := setTag(
 		repo,
