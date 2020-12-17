@@ -19,18 +19,13 @@ package cmd
 
 import (
 	"bufio"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
-	"os/exec"
 	"strings"
-	"text/template"
-	"time"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
-	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
 )
 
@@ -133,133 +128,8 @@ func publicKey(keyname string) (*ssh.PublicKeys, error) {
 
 }
 
-func tagExists(tag string, repo *git.Repository) (bool, error) {
-
-	tagFoundError := "tag exists"
-
-	tags, err := repo.TagObjects()
-
-	if err != nil {
-		return false, err
-	}
-
-	res := false
-
-	err = tags.ForEach(func(t *object.Tag) error {
-		if t.Name == tag {
-			res = true
-			return fmt.Errorf(tagFoundError)
-		}
-		return nil
-	})
-
-	if err != nil && err.Error() != tagFoundError {
-		return false, err
-	}
-
-	return res, nil
-}
-
-func setTag(repo *git.Repository, tag string, tagger *object.Signature) (bool, error) {
-
-	alreadyTagged, _ := tagExists(tag, repo)
-	if alreadyTagged {
-		c := confirm("Tag already exists. Continue using exising tag?")
-		if !c {
-			// Do not continue with existing tag
-			return false, errors.New("cancelled by user")
-		}
-
-		// Continue with the existing tag
-		return true, nil
-	}
-
-	head, err := repo.Head()
-
-	if err != nil {
-		return false, err
-	}
-
-	// TODO: Implement this
-	//input, err := captureInputFromEditor()
-
-	message := fmt.Sprintf("Creating tag %s", tag) // This is the message to update with the prompt
-
-	createOpts := &git.CreateTagOptions{
-		Tagger:  tagger,
-		Message: message,
-	}
-
-	if verbose {
-		fmt.Printf(
-			"\ntag %s\n"+
-				"Tagger: %s <%s>\n"+
-				"Date:   %s\n"+
-				"\n"+
-				"%s\n"+
-				"\n",
-			tag,
-			tagger.Name,
-			tagger.Email,
-			tagger.When,
-			message,
-		)
-	}
-
-	_, err = repo.CreateTag(tag, head.Hash(), createOpts)
-
-	if err != nil {
-		return false, err
-	}
-
-	return true, nil
-}
-
-func defaultSignature(name, email string) *object.Signature {
-	return &object.Signature{
-		Name:  name,
-		Email: email,
-		When:  time.Now(),
-	}
-}
-
-func pushTags(repo *git.Repository) error {
-	auth, err := ssh.NewSSHAgentAuth("git")
-
-	if err != nil {
-		return err
-	}
-
-	pushOpts := &git.PushOptions{
-		RemoteName: remote,
-		Progress:   gitopts.progress,
-		RefSpecs:   []config.RefSpec{config.RefSpec("refs/tags/*:refs/tags/*")},
-		Auth:       auth,
-	}
-
-	err = repo.Push(pushOpts)
-
-	if err != nil {
-		if err == git.NoErrAlreadyUpToDate {
-			if verbose {
-				fmt.Printf("remote %s already up to date\n", remote)
-			}
-			return nil
-		}
-
-		return err
-	}
-
-	return nil
-}
-
 func run() error {
-	input, err := captureInputFromEditor(getPreferredEditorFromEnvironment)
-	if err != nil {
-		return err
-	}
-
-	fmt.Println(input)
+	fmt.Println(tagMessage)
 
 	os.Exit(1)
 
@@ -278,11 +148,22 @@ func run() error {
 		return fmt.Errorf("cannot clone repository: %s", err)
 	}
 
+	// Get the repoConfig to find the username and email
 	repoConfig, err := repo.ConfigScoped(config.GlobalScope)
+
+	// Prompt for an annotationMessage
+	// TODO: Not if one is provided?
+	input, err := captureInputFromEditor(getPreferredEditorFromEnvironment)
+	if err != nil {
+		return err
+	}
+
+	annotationMessage := stripComments(string(input))
 
 	tagged, err := setTag(
 		repo,
 		tag,
+		annotationMessage,
 		defaultSignature(
 			repoConfig.User.Name,
 			repoConfig.User.Email,
@@ -303,84 +184,4 @@ func run() error {
 
 	return nil
 
-}
-
-func captureInputFromEditor(resolveEditor preferredEditorResolver) ([]byte, error) {
-	tempFile, err := createTempFile()
-	defer os.Remove(tempFile.Name())
-
-	if err != nil {
-		return []byte{}, err
-	}
-
-	fileName := tempFile.Name()
-
-	msg := "\n\n\n# Please enter the tag message for your annotated tag. Lines starting\n" +
-		"# with '#' will be ignored, and an empty message aborts the tagging."
-
-	err = ioutil.WriteFile(fileName, []byte(msg), 0644)
-	if err != nil {
-		return []byte{}, err
-	}
-
-	if err = tempFile.Close(); err != nil {
-		return []byte{}, err
-	}
-
-	if err = openFileInEditor(fileName, resolveEditor); err != nil {
-		return []byte{}, err
-	}
-
-	bytes, err := ioutil.ReadFile(fileName)
-	if err != nil {
-		return []byte{}, err
-	}
-
-	return bytes, nil
-}
-
-func openFileInEditor(filename string, resolveEditor preferredEditorResolver) error {
-	// Get the full executable path for the editor.
-	executable, err := exec.LookPath(resolveEditor())
-	if err != nil {
-		return err
-	}
-
-	cmd := exec.Command(executable, filename)
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	return cmd.Run()
-}
-
-// PreferredEditorResolver is a function that returns an editor that the user
-// prefers to use, such as the configured `$EDITOR` environment variable.
-type preferredEditorResolver func() string
-
-// getPreferredEditorFromEnvironment returns the user's editor as defined by the
-// `$EDITOR` environment variable, or the `DefaultEditor` if it is not set.
-func getPreferredEditorFromEnvironment() string {
-	editor := os.Getenv("EDITOR")
-	if editor == "" {
-		editor = defaultEditor
-	}
-
-	return editor
-}
-
-func generateTagMessageFromTemplate() (*template.Template, error) {
-	template, err := template.New("tagMessage").Parse(
-		"tag {{ tag }} " +
-			"Tagger: {{ name }} <{{ email }}>" +
-			"Date:   {{ date }}" +
-			"" +
-			"{{ tagMessage }}",
-	)
-
-	if err != nil {
-		return template, err
-	}
-
-	return template, nil
 }

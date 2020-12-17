@@ -32,6 +32,7 @@ var verbose bool
 var privateKey string
 var repositoryURL string
 var tag string
+var tagMessage string
 
 // TODO: Make this configurable
 var defaultEditor string = "vim"
@@ -69,7 +70,6 @@ a single command. At the moment, a Makefile with a "build" target is required.`,
 
 		verbose = viper.GetBool("verbose")
 		privateKey = viper.GetString("privateKey")
-		tag = viper.GetString("tag")
 		repositoryURL = viper.GetString("repositoryURL")
 
 		err := validate()
@@ -135,12 +135,14 @@ func init() {
 	// Tag name; required
 	rootCmd.PersistentFlags().StringVarP(&tag, "tag", "t", "", "tag to create or use for the release")
 
+	// Tag message; optional - will prompt otherwise
+	rootCmd.PersistentFlags().StringVarP(&tag, "tagMessage", "m", "", "annotated tag message")
+
 	// Repository; required
 	rootCmd.PersistentFlags().StringVarP(&repositoryURL, "repositoryURL", "r", "", "repository url")
 
 	viper.BindPFlag("verbose", rootCmd.PersistentFlags().Lookup("verbose"))
 	viper.BindPFlag("privateKey", rootCmd.PersistentFlags().Lookup("privateKey"))
-	viper.BindPFlag("tag", rootCmd.PersistentFlags().Lookup("tag"))
 	viper.BindPFlag("repositoryURL", rootCmd.PersistentFlags().Lookup("repositoryURL"))
 
 }
