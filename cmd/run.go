@@ -149,25 +149,21 @@ func run() error {
 	// Get the repoConfig to find the username and email
 	repoConfig, err := repo.ConfigScoped(config.GlobalScope)
 
-	// Prompt for an annotationMessage
-	// TODO: Not if one is provided?
-	var input string
-	if tagMessage != "" {
-		input = tagMessage
-	} else {
-		i, err := captureInputFromEditor(getPreferredEditorFromEnvironment)
+	// Prompt for a tag annotation message if one was not provided
+	if tagMessage == "" {
+		input, err := captureInputFromEditor(getPreferredEditorFromEnvironment)
 		if err != nil {
 			return err
 		}
-		input = string(i)
+		tagMessage = string(input)
 	}
 
-	annotationMessage := stripComments(string(input))
+	tagMessage = stripComments(tagMessage)
 
 	tagged, err := setTag(
 		repo,
 		tag,
-		annotationMessage,
+		tagMessage,
 		defaultSignature(
 			repoConfig.User.Name,
 			repoConfig.User.Email,

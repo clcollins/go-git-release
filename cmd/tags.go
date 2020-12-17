@@ -20,7 +20,6 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"os"
 	"regexp"
 	"time"
 
@@ -82,9 +81,11 @@ func setTag(repo *git.Repository, tag string, message string, tagger *object.Sig
 		Message: message,
 	}
 
+	// TODO: Add the commit information so it looks like the output from Git
+	// TODO: Format the date so it matches Git
 	if verbose {
 		fmt.Printf(
-			"\n%s\n\n"+
+			"\ntag %s\n\n"+
 				"Tagger: %s <%s>\n"+
 				"Date:   %s\n"+
 				"\n"+
@@ -97,9 +98,6 @@ func setTag(repo *git.Repository, tag string, message string, tagger *object.Sig
 			message,
 		)
 	}
-
-	fmt.Println("exiting in setTag()")
-	os.Exit(1)
 
 	_, err = repo.CreateTag(tag, head.Hash(), createOpts)
 
