@@ -29,10 +29,12 @@ import (
 
 var cfgFile string
 var verbose bool
+var force bool
 var privateKey string
 var repositoryURL string
 var tag string
 var tagMessage string
+var makeTarget string
 
 // TODO: Make this configurable
 var defaultEditor string = "vim"
@@ -124,12 +126,17 @@ func init() {
 	// Enable verbose output
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "enable verbose output")
 
-	// Path to private key; defaults to "id_rsa"
-	rootCmd.PersistentFlags().StringVarP(&privateKey, "privateKey", "k", "id_rsa", "SSH private key to use for authentication")
+	// Don't prompt for anything; just do
+	rootCmd.PersistentFlags().BoolVarP(&force, "force", "f", false, "force; do not prompt for anything")
 
+	// TODO: This currently isn't utilized, as the SSH agent is the connection method
+	// TODO: add a way to override and provide the key
+	// Path to private key; defaults to "id_rsa"
+	// rootCmd.PersistentFlags().StringVarP(&privateKey, "privateKey", "k", "id_rsa", "SSH private key to use for authentication")
+
+	// TODO: Do we need this? If we're cloning the repo to a temp dir, it'll always be "origin".
+	// TODO: Or do we want to act on a clone in the cwd?
 	// Name of git remote to tag/push/release; "defaults to upstream"
-	// Do we need this? If we're cloning the repo to a temp dir, it'll always be "origin".
-	// Or do we want to act on a clone in the cwd?
 	// rootCmd.PersistentFlags().StringVarP(&remote, "remote", "R", "upstream", "git remote to act on")
 
 	// Tag name; required
@@ -141,9 +148,16 @@ func init() {
 	// Repository; required
 	rootCmd.PersistentFlags().StringVarP(&repositoryURL, "repositoryURL", "r", "", "repository url")
 
+	// Make target for build; optional (defaults to "build")
+	rootCmd.PersistentFlags().StringVarP(&makeTarget, "makeTarget", "M", "build", "make target to build artifacts")
+
 	viper.BindPFlag("verbose", rootCmd.PersistentFlags().Lookup("verbose"))
-	viper.BindPFlag("privateKey", rootCmd.PersistentFlags().Lookup("privateKey"))
+	viper.BindPFlag("force", rootCmd.PersistentFlags().Lookup("force"))
 	viper.BindPFlag("repositoryURL", rootCmd.PersistentFlags().Lookup("repositoryURL"))
+	viper.BindPFlag("makeTarget", rootCmd.PersistentFlags().Lookup("makeTarget"))
+
+	// TODO: this is currently not impelemented
+	viper.BindPFlag("privateKey", rootCmd.PersistentFlags().Lookup("privateKey"))
 
 }
 

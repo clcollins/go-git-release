@@ -58,18 +58,6 @@ func tagExists(tag string, repo *git.Repository) (bool, error) {
 
 func setTag(repo *git.Repository, tag string, message string, tagger *object.Signature) (bool, error) {
 
-	alreadyTagged, _ := tagExists(tag, repo)
-	if alreadyTagged {
-		c := confirm("Tag already exists. Continue using exising tag?")
-		if !c {
-			// Do not continue with existing tag
-			return false, errors.New("cancelled by user")
-		}
-
-		// Continue with the existing tag
-		return true, nil
-	}
-
 	head, err := repo.Head()
 
 	if err != nil {
@@ -152,4 +140,60 @@ func stripComments(s string) string {
 	r := regexp.MustCompile("(?m)^#.*")
 	return r.ReplaceAllString(s, "")
 
+}
+
+// createTag checks if a tag exists, creates a new one with a user-provided annotation if not
+func createTag(repo *git.Repository) error {
+	// Get the repoConfig to find the username and email
+	repoConfig, err := repo.ConfigScoped(config.GlobalScope)
+
+	// Check to see if the tag exists
+	// If it does not, continue on to create the tag
+	// If it does, prompt the user if they want to use the existing tag or bail
+	alreadyTagged, _ := tagExists(tag, repo)
+	if alreadyTagged {
+		c := confirm("Tag already exists. Continue using exising tag?")
+		if !c {
+			// Do not continue
+			return errors.New("tag exists; execution cancelled by user")
+		}
+
+		// Return, no need to create a new tag
+		return nil
+	}
+
+	// Prompt for a tag annotation message if one was not provided
+	if tagMessage == "" {
+		input, err := captureInputFromEditor(getPreferredEditorFromEnvironment)
+		if err != nil {
+			return err
+		}
+		tagMessage = string(input)
+	}
+
+	tagMessage = stripComments(tagMessage)
+
+	tagged, err := setTag(
+		repo,
+		tag,
+		tagMessage,
+		defaultSignature(
+			repoConfig.User.Name,
+			repoConfig.User.Email,
+		),
+	)
+
+	if err != nil {
+		return fmt.Errorf("failed creating tag: %s", err)
+	}
+
+	if tagged {
+		err = pushTags(repo)
+
+		if err != nil {
+			return fmt.Errorf("failed pushing tag to remote: %s", err)
+		}
+	}
+
+	return nil
 }
