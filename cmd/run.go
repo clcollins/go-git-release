@@ -25,7 +25,6 @@ import (
 	"strings"
 
 	"github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
 )
 
@@ -57,7 +56,14 @@ func createTempFile() (*os.File, error) {
 
 }
 
+// confirm prompts the user for yes or no, with a message from the provided string
+// Immediately returns true (yes) if the "force" flag is set
 func confirm(s string) bool {
+	// If the force flag is set, assume true
+	if force {
+		return true
+	}
+
 	reader := bufio.NewReader(os.Stdin)
 
 	for {
@@ -79,6 +85,7 @@ func confirm(s string) bool {
 	}
 }
 
+// cloneRepo clones the provided git repository into the provided directory using the SSH Agent "git" identity
 func cloneRepo(url, dir string) (*git.Repository, error) {
 
 	if verbose {
@@ -146,40 +153,10 @@ func run() error {
 		return fmt.Errorf("cannot clone repository: %s", err)
 	}
 
-	// Get the repoConfig to find the username and email
-	repoConfig, err := repo.ConfigScoped(config.GlobalScope)
-
-	// Prompt for a tag annotation message if one was not provided
-	if tagMessage == "" {
-		input, err := captureInputFromEditor(getPreferredEditorFromEnvironment)
-		if err != nil {
-			return err
-		}
-		tagMessage = string(input)
-	}
-
-	tagMessage = stripComments(tagMessage)
-
-	tagged, err := setTag(
-		repo,
-		tag,
-		tagMessage,
-		defaultSignature(
-			repoConfig.User.Name,
-			repoConfig.User.Email,
-		),
-	)
-
+	// Create the tag
+	err = createTag(repo)
 	if err != nil {
-		return fmt.Errorf("failed creating tag: %s", err)
-	}
-
-	if tagged {
-		err = pushTags(repo)
-
-		if err != nil {
-			return fmt.Errorf("failed pushing tag to remote: %s", err)
-		}
+		return fmt.Errorf("cannot create tag: %s", err)
 	}
 
 	return nil
