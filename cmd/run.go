@@ -129,10 +129,7 @@ func publicKey(keyname string) (*ssh.PublicKeys, error) {
 }
 
 func run() error {
-	fmt.Println(tagMessage)
-
-	os.Exit(1)
-
+	// Create a tempDir to clone into
 	tempDir, err := createTempDir()
 
 	if err != nil {
@@ -142,6 +139,7 @@ func run() error {
 	// Cleanup tempDir
 	defer os.Remove(tempDir)
 
+	// Clone the remote
 	repo, err := cloneRepo(repositoryURL, tempDir)
 
 	if err != nil {
@@ -153,9 +151,15 @@ func run() error {
 
 	// Prompt for an annotationMessage
 	// TODO: Not if one is provided?
-	input, err := captureInputFromEditor(getPreferredEditorFromEnvironment)
-	if err != nil {
-		return err
+	var input string
+	if tagMessage != "" {
+		input = tagMessage
+	} else {
+		i, err := captureInputFromEditor(getPreferredEditorFromEnvironment)
+		if err != nil {
+			return err
+		}
+		input = string(i)
 	}
 
 	annotationMessage := stripComments(string(input))

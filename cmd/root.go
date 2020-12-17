@@ -136,7 +136,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVarP(&tag, "tag", "t", "", "tag to create or use for the release")
 
 	// Tag message; optional - will prompt otherwise
-	rootCmd.PersistentFlags().StringVarP(&tag, "tagMessage", "m", "", "annotated tag message")
+	rootCmd.PersistentFlags().StringVarP(&tagMessage, "tagMessage", "m", "", "annotated tag message")
 
 	// Repository; required
 	rootCmd.PersistentFlags().StringVarP(&repositoryURL, "repositoryURL", "r", "", "repository url")

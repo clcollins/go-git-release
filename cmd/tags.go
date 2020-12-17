@@ -84,7 +84,7 @@ func setTag(repo *git.Repository, tag string, message string, tagger *object.Sig
 
 	if verbose {
 		fmt.Printf(
-			"\ntag %s\n"+
+			"\n%s\n\n"+
 				"Tagger: %s <%s>\n"+
 				"Date:   %s\n"+
 				"\n"+
