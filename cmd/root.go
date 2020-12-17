@@ -27,15 +27,15 @@ import (
 	"github.com/spf13/viper"
 )
 
-// TODO: make these flags
-var name string = "Chris Collins"
-var email string = "collins.christopher@gmail.com"
-
 var cfgFile string
 var verbose bool
 var privateKey string
 var repositoryURL string
 var tag string
+
+// TODO: Make this configurable
+var defaultEditor string = "vim"
+
 var home string
 
 // See below - does this need to be a cli flag?
