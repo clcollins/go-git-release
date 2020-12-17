@@ -23,7 +23,9 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"strings"
+	"text/template"
 	"time"
 
 	"github.com/go-git/go-git/v5"
@@ -43,6 +45,20 @@ func createTempDir() (string, error) {
 	}
 
 	return tempDir, nil
+
+}
+
+func createTempFile() (*os.File, error) {
+	// find some way to specify this by project?
+	prefix := "ggt-"
+
+	tempFile, err := ioutil.TempFile(os.TempDir(), prefix)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return tempFile, nil
 
 }
 
@@ -164,6 +180,9 @@ func setTag(repo *git.Repository, tag string, tagger *object.Signature) (bool, e
 		return false, err
 	}
 
+	// TODO: Implement this
+	//input, err := captureInputFromEditor()
+
 	message := fmt.Sprintf("Creating tag %s", tag) // This is the message to update with the prompt
 
 	createOpts := &git.CreateTagOptions{
@@ -235,6 +254,15 @@ func pushTags(repo *git.Repository) error {
 }
 
 func run() error {
+	input, err := captureInputFromEditor(getPreferredEditorFromEnvironment)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println(input)
+
+	os.Exit(1)
+
 	tempDir, err := createTempDir()
 
 	if err != nil {
@@ -275,4 +303,84 @@ func run() error {
 
 	return nil
 
+}
+
+func captureInputFromEditor(resolveEditor preferredEditorResolver) ([]byte, error) {
+	tempFile, err := createTempFile()
+	defer os.Remove(tempFile.Name())
+
+	if err != nil {
+		return []byte{}, err
+	}
+
+	fileName := tempFile.Name()
+
+	msg := "\n\n\n# Please enter the tag message for your annotated tag. Lines starting\n" +
+		"# with '#' will be ignored, and an empty message aborts the tagging."
+
+	err = ioutil.WriteFile(fileName, []byte(msg), 0644)
+	if err != nil {
+		return []byte{}, err
+	}
+
+	if err = tempFile.Close(); err != nil {
+		return []byte{}, err
+	}
+
+	if err = openFileInEditor(fileName, resolveEditor); err != nil {
+		return []byte{}, err
+	}
+
+	bytes, err := ioutil.ReadFile(fileName)
+	if err != nil {
+		return []byte{}, err
+	}
+
+	return bytes, nil
+}
+
+func openFileInEditor(filename string, resolveEditor preferredEditorResolver) error {
+	// Get the full executable path for the editor.
+	executable, err := exec.LookPath(resolveEditor())
+	if err != nil {
+		return err
+	}
+
+	cmd := exec.Command(executable, filename)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	return cmd.Run()
+}
+
+// PreferredEditorResolver is a function that returns an editor that the user
+// prefers to use, such as the configured `$EDITOR` environment variable.
+type preferredEditorResolver func() string
+
+// getPreferredEditorFromEnvironment returns the user's editor as defined by the
+// `$EDITOR` environment variable, or the `DefaultEditor` if it is not set.
+func getPreferredEditorFromEnvironment() string {
+	editor := os.Getenv("EDITOR")
+	if editor == "" {
+		editor = defaultEditor
+	}
+
+	return editor
+}
+
+func generateTagMessageFromTemplate() (*template.Template, error) {
+	template, err := template.New("tagMessage").Parse(
+		"tag {{ tag }} " +
+			"Tagger: {{ name }} <{{ email }}>" +
+			"Date:   {{ date }}" +
+			"" +
+			"{{ tagMessage }}",
+	)
+
+	if err != nil {
+		return template, err
+	}
+
+	return template, nil
 }
