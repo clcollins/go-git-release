@@ -12,8 +12,8 @@ Current Limitations:
 ## Usage
 
 ```shell
-# Clone the default branch of the providied repositoryURL, create an annotated tag with the provided message, and run the Make
-"buildRelease" target to generate assets
+# Clone the default branch of the providied repositoryURL, create an annotated tag with 
+# the provided message, and run the Make "buildRelease" target to generate assets
 
 ./go-git-release --tag v0.1.0 --repositoryURL git@github.com:clcollins/go-git-release.go \
                  --tagMessage "This is version 0.1.0 of go-git-release"
