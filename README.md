@@ -4,6 +4,27 @@ A CLI tool to create a tag, build binary artifacts and create a Github release w
 
 Project Status: **Extreme Alpha**
 
+Current Limitations:
+
+1. Currently, this does not create a release or upload the artifacts, it just tags, pushes the tag and builds the artifacts
+2. Currently, the "continue with an existing tag" option doesn't actually check out the tag
+
+## Usage
+
+```shell
+# Clone the default branch of the providied repositoryURL, create an annotated tag with the provided message, and run the Make
+"buildRelease" target to generate assets
+
+./go-git-release --tag v0.1.0 --repositoryURL git@github.com:clcollins/go-git-release.go -m "This is version 0.1.0 of
+go-git-release"
+```
+
+If the tag already exists, `go-git-release` will prompt whether or not to use the existing tag.
+
+If a tag annotation message is not provided, `go-git-release` will open an editor, Git-style, and prompt the user for a message.
+
+
+
 ## Configuration
 
 Command line flags can alternatively be privided via a configuration file or environment variables.
