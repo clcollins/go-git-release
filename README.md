@@ -15,8 +15,8 @@ Current Limitations:
 # Clone the default branch of the providied repositoryURL, create an annotated tag with the provided message, and run the Make
 "buildRelease" target to generate assets
 
-./go-git-release --tag v0.1.0 --repositoryURL git@github.com:clcollins/go-git-release.go -m "This is version 0.1.0 of
-go-git-release"
+./go-git-release --tag v0.1.0 --repositoryURL git@github.com:clcollins/go-git-release.go \
+                 --tagMessage "This is version 0.1.0 of go-git-release"
 ```
 
 If the tag already exists, `go-git-release` will prompt whether or not to use the existing tag.
