@@ -159,6 +159,11 @@ func run() error {
 		return fmt.Errorf("cannot create tag: %s", err)
 	}
 
-	return nil
+	// Run a build
+	err = makeBuild(tempDir)
+	if err != nil {
+		return fmt.Errorf("failed building artifacts: %s", err)
+	}
 
+	return nil
 }

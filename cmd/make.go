@@ -22,9 +22,10 @@ import (
 	"os/exec"
 )
 
-func makeBuild() error {
+func makeBuild(tempDir string) error {
 
 	cmd := exec.Command("make", makeTarget)
+	cmd.Dir = tempDir
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr

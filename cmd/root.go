@@ -71,8 +71,11 @@ a single command. At the moment, a Makefile with a "build" target is required.`,
 		}
 
 		verbose = viper.GetBool("verbose")
-		privateKey = viper.GetString("privateKey")
 		repositoryURL = viper.GetString("repositoryURL")
+		makeTarget = viper.GetString("makeTarget")
+
+		// TODO: This is not yet implemented
+		// privateKey = viper.GetString("privateKey")
 
 		err := validate()
 		if err != nil {
@@ -149,7 +152,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVarP(&repositoryURL, "repositoryURL", "r", "", "repository url")
 
 	// Make target for build; optional (defaults to "build")
-	rootCmd.PersistentFlags().StringVarP(&makeTarget, "makeTarget", "M", "build", "make target to build artifacts")
+	rootCmd.PersistentFlags().StringVarP(&makeTarget, "makeTarget", "M", "buildRelease", "make target to build artifacts")
 
 	viper.BindPFlag("verbose", rootCmd.PersistentFlags().Lookup("verbose"))
 	viper.BindPFlag("force", rootCmd.PersistentFlags().Lookup("force"))
@@ -157,7 +160,7 @@ func init() {
 	viper.BindPFlag("makeTarget", rootCmd.PersistentFlags().Lookup("makeTarget"))
 
 	// TODO: this is currently not impelemented
-	viper.BindPFlag("privateKey", rootCmd.PersistentFlags().Lookup("privateKey"))
+	// viper.BindPFlag("privateKey", rootCmd.PersistentFlags().Lookup("privateKey"))
 
 }
 
