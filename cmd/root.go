@@ -27,6 +27,9 @@ import (
 	"github.com/spf13/viper"
 )
 
+// TODO: remove this clientID
+var clientID string
+
 var cfgFile string
 var verbose bool
 var force bool
@@ -69,6 +72,9 @@ a single command. At the moment, a Makefile with a "build" target is required.`,
 			}
 			fmt.Printf("\n")
 		}
+
+		// TODO: remove this clientID
+		clientID = viper.GetString("clientID")
 
 		verbose = viper.GetBool("verbose")
 		repositoryURL = viper.GetString("repositoryURL")

@@ -11,3 +11,5 @@ verbose: true
 # Which private key to use for authentication.  Must be in the ".ssh/" directory of the user's homedir
 privateKey: id_ed25519
 
+# A Makefile target that generates artifacts for the release
+makeTarget: build_releas
