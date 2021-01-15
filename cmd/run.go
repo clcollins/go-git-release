@@ -169,28 +169,22 @@ func run() error {
 		}
 	}
 
-	fmt.Println("did nothing; got here")
-	fmt.Printf(clientID)
+	fmt.Println("DEBUG: did nothing; got here")
 
 	// Create a release
-	// AUTH:
-	//		request user & device codes
+	// request user & device codes
 	var scope string = ""
 	authResponse, err := requestDeviceAndUserCodes(githubEndpoint.DeviceAuthURL, clientID, scope)
 	if err != nil {
 		return fmt.Errorf("failed requesting device and user codes from github: %s", err)
 	}
-	fmt.Println(authResponse.DeviceCode)
-	fmt.Println(authResponse.UserCode)
-	fmt.Println(authResponse.VerificationURI)
-	fmt.Println(authResponse.ExpiresIn)
-	fmt.Println(authResponse.Interval)
 
-	//		prompt user
+	// prompt user to authorize
 	fmt.Printf("Please enter your one-time verification code at %s\n", authResponse.VerificationURI)
 	fmt.Printf("One-time code: %s\n", authResponse.UserCode)
 	openbrowser(authResponse.VerificationURI)
 
+	// poll for auth status
 	userAuthResponse, err := pollForAccessToken(
 		githubEndpoint.TokenURL,
 		clientID,
@@ -202,12 +196,11 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("failed checking for authorization and retrieving access token: %s", err)
 	}
+
 	fmt.Println(userAuthResponse.AccessToken)
 	fmt.Println(userAuthResponse.TokenType)
 	fmt.Println(userAuthResponse.Scope)
 
-	// Start timeout to Expires; check Interval ; move on when authed
-	//		poll for auth status
 	// List releases (does one exist?)
 	// https://docs.github.com/en/free-pro-team@latest/rest/reference/repos#list-releases
 	// Create a Release

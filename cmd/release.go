@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"net/url"
 	"os/exec"
@@ -129,7 +128,7 @@ func retrieveAccessToken(req *http.Request) (*UserAuth, bool, error) {
 	err = json.Unmarshal(body, &auth)
 	if err != nil {
 		if verbose {
-			log.Println("error unmarshallng JSON response")
+			fmt.Println("error unmarshallng JSON response")
 		}
 		return nil, false, err
 	}
@@ -138,9 +137,18 @@ func retrieveAccessToken(req *http.Request) (*UserAuth, bool, error) {
 	err = json.Unmarshal(body, &auth.raw)
 	if err != nil {
 		if verbose {
-			log.Println("error unmarshalling raw JSON response")
+			fmt.Println("error unmarshalling raw JSON response")
 		}
 		return nil, false, err
+	}
+
+	if reqErr, ok := auth.raw["error"]; ok {
+		switch reqErr {
+		case "authorization_pending":
+			return auth, false, nil
+		default:
+			return auth, false, fmt.Errorf("%v", reqErr)
+		}
 	}
 
 	return auth, true, err
@@ -153,7 +161,7 @@ func makeHTTPRequest(req *http.Request) ([]byte, error) {
 	r, err := ctxhttp.Do(context.TODO(), nil, req)
 	if err != nil {
 		if verbose {
-			log.Println("error executing http request")
+			fmt.Println("error executing http request")
 		}
 		return nil, err
 	}
@@ -161,7 +169,7 @@ func makeHTTPRequest(req *http.Request) ([]byte, error) {
 	// check to see if the initial device flow request succeded
 	if code := r.StatusCode; code != 200 {
 		if verbose {
-			log.Printf("error bad response code: %d\n", code)
+			fmt.Printf("error bad response code: %d\n", code)
 		}
 		return nil, fmt.Errorf("failed device auth initiation: %s", r.Status)
 	}
@@ -170,7 +178,7 @@ func makeHTTPRequest(req *http.Request) ([]byte, error) {
 	body, err := ioutil.ReadAll(io.LimitReader(r.Body, 1<<20))
 	if err != nil {
 		if verbose {
-			log.Println("error ready response body")
+			fmt.Println("error ready response body")
 		}
 		return nil, err
 	}
@@ -182,7 +190,8 @@ func makeHTTPRequest(req *http.Request) ([]byte, error) {
 func pollForAccessToken(userAuthURL, clientID, deviceCode, grantType string, expiresIn, interval int) (*UserAuth, error) {
 
 	timeout := time.After(time.Duration(expiresIn) * time.Second)
-	ticker := time.Tick(time.Duration(interval) * time.Second)
+	// allowed to poll every `interval`, so just add a second to not be greedy
+	ticker := time.Tick(time.Duration(interval)*time.Second + 1)
 
 	// set input parameters
 	params := url.Values{}
@@ -203,7 +212,16 @@ func pollForAccessToken(userAuthURL, clientID, deviceCode, grantType string, exp
 		case <-ticker:
 			auth, ok, err := retrieveAccessToken(req)
 			if err != nil {
-				return nil, err
+				fmt.Println(err)
+				if err.Error() == "slow_down" {
+					if verbose {
+						fmt.Printf("Warning: Slow Down\n Slow to: %+vs\n", auth.raw["interval"])
+					}
+					interval = int(auth.raw["interval"].(float64)) + 1
+					ticker = time.Tick(time.Duration(interval)*time.Second + 1)
+				} else {
+					return nil, err
+				}
 			} else if ok {
 				return auth, nil
 			}
@@ -241,7 +259,7 @@ func requestDeviceAndUserCodes(deviceAuthURL, clientID, scope string) (*DeviceAu
 	err = json.Unmarshal(body, &auth)
 	if err != nil {
 		if verbose {
-			log.Println("error unmarshallng JSON response")
+			fmt.Println("error unmarshallng JSON response")
 		}
 		return nil, err
 	}
@@ -250,7 +268,7 @@ func requestDeviceAndUserCodes(deviceAuthURL, clientID, scope string) (*DeviceAu
 	err = json.Unmarshal(body, &auth.raw)
 	if err != nil {
 		if verbose {
-			log.Println("error unmarshalling raw JSON response")
+			fmt.Println("error unmarshalling raw JSON response")
 		}
 		return nil, err
 	}
