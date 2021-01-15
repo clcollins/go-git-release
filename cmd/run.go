@@ -197,9 +197,9 @@ func run() error {
 		return fmt.Errorf("failed checking for authorization and retrieving access token: %s", err)
 	}
 
-	fmt.Println(userAuthResponse.AccessToken)
+	// fmt.Println(userAuthResponse.AccessToken)
 	fmt.Println(userAuthResponse.TokenType)
-	fmt.Println(userAuthResponse.Scope)
+	// fmt.Println(userAuthResponse.Scope)
 
 	// List releases (does one exist?)
 	// https://docs.github.com/en/free-pro-team@latest/rest/reference/repos#list-releases
