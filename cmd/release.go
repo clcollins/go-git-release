@@ -142,16 +142,47 @@ func retrieveAccessToken(req *http.Request) (*UserAuth, bool, error) {
 		return nil, false, err
 	}
 
-	if reqErr, ok := auth.raw["error"]; ok {
-		switch reqErr {
-		case "authorization_pending":
-			return auth, false, nil
-		default:
-			return auth, false, fmt.Errorf("%v", reqErr)
+	switch e := auth.raw["error"]; e {
+	case "authorization_pending":
+		if verbose {
+			fmt.Println(e)
 		}
+		return auth, false, nil
+	case "slow_down":
+		if verbose {
+			fmt.Println(e)
+			fmt.Printf("INTERVAL FROM GITHUB: %v\n", auth.raw["interval"])
+		}
+		return auth, false, fmt.Errorf("%v", e)
+	case "expired_token":
+		if verbose {
+			fmt.Println(e)
+		}
+		return auth, false, fmt.Errorf("%v", e)
+	case "unsupported_grant_type":
+		if verbose {
+			fmt.Println(e)
+		}
+		return auth, false, fmt.Errorf("%v", e)
+	case "incorrect_client_credentials":
+		if verbose {
+			fmt.Println(e)
+		}
+		return auth, false, fmt.Errorf("%v", e)
+	case "incorrect_device_code":
+		if verbose {
+			fmt.Println(e)
+		}
+		return auth, false, fmt.Errorf("%v", e)
+	case "access_denied":
+		if verbose {
+			fmt.Println(e)
+		}
+		return auth, false, fmt.Errorf("%v", e)
 	}
 
-	return auth, true, err
+	return auth, true, nil
+
 }
 
 // make HTTPRequest takes an http.Request, executes the request, checks for a 200
@@ -208,26 +239,25 @@ func pollForAccessToken(userAuthURL, clientID, deviceCode, grantType string, exp
 	for {
 		select {
 		case <-timeout:
+			fmt.Println("timeout")
 			return nil, errors.New("timeout reached")
 		case <-ticker:
 			auth, ok, err := retrieveAccessToken(req)
+			if ok {
+				return auth, nil
+			}
 			if err != nil {
-				fmt.Println(err)
 				if err.Error() == "slow_down" {
-					if verbose {
-						fmt.Printf("Warning: Slow Down\n Slow to: %+vs\n", auth.raw["interval"])
-					}
+					fmt.Printf("slow down; adding %v seconds to interval", auth.raw["interval"])
 					interval = int(auth.raw["interval"].(float64)) + 1
 					ticker = time.Tick(time.Duration(interval)*time.Second + 1)
+					time.Sleep(time.Duration(interval))
 				} else {
-					return nil, err
+					return auth, err
 				}
-			} else if ok {
-				return auth, nil
 			}
 		}
 	}
-
 }
 
 // Call the device login url

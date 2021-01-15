@@ -169,8 +169,6 @@ func run() error {
 		}
 	}
 
-	fmt.Println("DEBUG: did nothing; got here")
-
 	// Create a release
 	// request user & device codes
 	var scope string = ""
