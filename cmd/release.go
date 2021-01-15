@@ -151,7 +151,6 @@ func retrieveAccessToken(req *http.Request) (*UserAuth, bool, error) {
 	case "slow_down":
 		if verbose {
 			fmt.Println(e)
-			fmt.Printf("INTERVAL FROM GITHUB: %v\n", auth.raw["interval"])
 		}
 		return auth, false, fmt.Errorf("%v", e)
 	case "expired_token":
@@ -248,7 +247,7 @@ func pollForAccessToken(userAuthURL, clientID, deviceCode, grantType string, exp
 			}
 			if err != nil {
 				if err.Error() == "slow_down" {
-					fmt.Printf("slow down; adding %v seconds to interval", auth.raw["interval"])
+					fmt.Printf("slow down; adding %v seconds to interval\n", auth.raw["interval"])
 					interval = int(auth.raw["interval"].(float64)) + 1
 					ticker = time.Tick(time.Duration(interval)*time.Second + 1)
 					time.Sleep(time.Duration(interval))
