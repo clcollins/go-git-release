@@ -1,5 +1,7 @@
 .vscode/
+bin/
 *-bak
 *-backup
 .go-git-release.yaml
 PROGRESS
+TODO
