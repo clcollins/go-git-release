@@ -18,6 +18,10 @@ fmt:
 build:
 	go build ${BUILDFLAGS} ${LDFLAGS} -o ./bin/$(APPNAME) main.go
 
+# build-release is the default make target for go-git-release
+# build-release in this instance just does the same as build
+build-release: build
+
 vet:
 	go vet ${BUILDFLAGS} ./...
 
