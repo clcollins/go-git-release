@@ -21,7 +21,9 @@ import (
 	"bufio"
 	"fmt"
 	"io/ioutil"
+	"net/url"
 	"os"
+	"regexp"
 	"strings"
 
 	"github.com/go-git/go-git/v5"
@@ -138,6 +140,12 @@ func publicKey(keyname string) (*ssh.PublicKeys, error) {
 func run() error {
 	var dryrun bool = true
 
+	// parse the user-provided git url
+	gURL, err := parseGitURL(repositoryURL)
+	if err != nil {
+		return err
+	}
+
 	if !dryrun {
 		// Create a tempDir to clone into
 		tempDir, err := createTempDir()
@@ -150,7 +158,7 @@ func run() error {
 		defer os.Remove(tempDir)
 
 		// Clone the remote
-		repo, err := cloneRepo(repositoryURL, tempDir)
+		repo, err := cloneRepo(gURL.raw, tempDir)
 
 		if err != nil {
 			return fmt.Errorf("cannot clone repository: %s", err)
@@ -167,6 +175,7 @@ func run() error {
 		if err != nil {
 			return fmt.Errorf("failed building artifacts: %s", err)
 		}
+
 	}
 
 	// Create a release
@@ -199,6 +208,12 @@ func run() error {
 	fmt.Println(userAuthResponse.TokenType)
 	// fmt.Println(userAuthResponse.Scope)
 
+	releases, err := getReleases(gURL)
+	fmt.Printf("RELEASES: %v\n", releases)
+
+	resp, err := createRelease(userAuthResponse, gURL, tag, tagMessage, "", false, false)
+	fmt.Printf("CREATE RELEASE RESPONSE: %+v\n", resp)
+
 	// List releases (does one exist?)
 	// https://docs.github.com/en/free-pro-team@latest/rest/reference/repos#list-releases
 	// Create a Release
@@ -206,4 +221,43 @@ func run() error {
 	// Upload Release Assets
 	// https://docs.github.com/en/free-pro-team@latest/rest/reference/repos#upload-a-release-asset
 	return nil
+}
+
+type gitURL struct {
+	parsedURL    *url.URL
+	organization string
+	repository   string
+	raw          string
+}
+
+// parseGitURL takes a gitURL string and parses it out into it's bits
+func parseGitURL(repositoryURL string) (*gitURL, error) {
+	var err error
+
+	// Raw working Regex for git URLs:  (git@|(https?:\/\/))((.*)(?::|\/)(\w*)\/([\w\-]*)(?:.git)?)
+	// tested against:
+	// git@github.com:foo/barbazbingo.git
+	// http://testing_foo.github.com/foo/barbaz_bingo_bango.git
+	// https://testing3.github.com/foo/barbaz-bingo-bango.git
+
+	expression := `(?P<scheme>git@|(https?:\/\/))(?P<host>.*)(?P<pathSeparator>:|\/)(?P<organization>\w*)\/(?P<repository>[\w\-]*)(?P<suffix>.git)?`
+	re := regexp.MustCompile(expression)
+	matches := re.FindStringSubmatch(repositoryURL)
+
+	u := &gitURL{
+		parsedURL: &url.URL{
+			Scheme: matches[re.SubexpIndex("scheme")],
+			Host:   matches[re.SubexpIndex("host")],
+			Path:   formatURLPath(matches, re),
+		},
+		repository:   matches[re.SubexpIndex("repository")],
+		organization: matches[re.SubexpIndex("organization")],
+		raw:          repositoryURL,
+	}
+
+	return u, err
+}
+
+func formatURLPath(matches []string, re *regexp.Regexp) string {
+	return fmt.Sprintf(matches[re.SubexpIndex("pathSeparator")] + matches[re.SubexpIndex("organization")] + "/" + matches[re.SubexpIndex("repository")] + matches[re.SubexpIndex("suffix")])
 }

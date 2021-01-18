@@ -71,6 +71,7 @@ var githubEndpoint = endpoint{
 	AuthURL:       "",
 	DeviceAuthURL: "https://github.com/login/device/code",
 	TokenURL:      "https://github.com/login/oauth/access_token",
+	ReleasesURL:   "https://api.github.com/repos/{ower}/{repo}/releases",
 }
 
 // endpoint contains the different authentication urls for a given service
@@ -78,6 +79,7 @@ type endpoint struct {
 	AuthURL       string
 	DeviceAuthURL string
 	TokenURL      string
+	ReleasesURL   string
 }
 
 // DeviceAuth contains the response from an OAuth2 device flow auth request
@@ -98,9 +100,24 @@ type UserAuth struct {
 	raw         map[string]interface{}
 }
 
+// newGetRequest creates an http.Request using the provided URL
+// and sets the Content-Type and Accept headers to values we can work with
+func newGetRequest(url string, params url.Values) (*http.Request, error) {
+	r, err := http.NewRequest("GET", url, strings.NewReader(params.Encode()))
+	if err != nil {
+		return nil, err
+	}
+
+	// content is submitted as x-www-form-urlencoded; accepted back as JSON
+	r.Header.Set("Contet-Type", "application/x-www-form-urlencoded")
+	r.Header.Set("Accept", "application/json")
+
+	return r, nil
+}
+
 // newPostRequest creates an http.Request using the provided URL and parameters
 // and sets the Content-Type and Accept headers to values we can work with
-func newPostRequest(url string, params url.Values) (*http.Request, error) {
+func newPostRequest(url string, params url.Values, headers ...map[string]string) (*http.Request, error) {
 	r, err := http.NewRequest("POST", url, strings.NewReader(params.Encode()))
 	if err != nil {
 		return nil, err
@@ -109,6 +126,17 @@ func newPostRequest(url string, params url.Values) (*http.Request, error) {
 	// content is submitted as x-www-form-urlencoded; accepted back as JSON
 	r.Header.Set("Contet-Type", "application/x-www-form-urlencoded")
 	r.Header.Set("Accept", "application/json")
+
+	// set any additional headers passed into the function
+	// this seems like an ugly way to do this
+	// a slice of maps? yuck
+	if len(headers) > 0 {
+		for _, h := range headers {
+			for k, v := range h {
+				r.Header.Set(k, v)
+			}
+		}
+	}
 
 	return r, nil
 }
@@ -344,4 +372,86 @@ func openbrowser(url string) {
 		fmt.Printf("Failed to automatically open browser. Please manually visit %s in a browser window.", url)
 	}
 
+}
+
+// getReleases retrieves a slice of releases from the gitURL
+func getReleases(gURL *gitURL) ([]release, error) {
+	releases := make([]release, 0)
+
+	// TEMP RELEASES URL HERE; LEARN TO TEMPLATE AND USE githubEndpoint.ReleasesURL
+	releasesURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/releases", gURL.organization, gURL.repository)
+	req, err := newGetRequest(releasesURL, url.Values{})
+	if err != nil {
+		return releases, err
+	}
+
+	body, err := makeHTTPRequest(req)
+	if err != nil {
+		return releases, err
+	}
+
+	// unmarshal the response
+	err = json.Unmarshal(body, &releases)
+	if err != nil {
+		if verbose {
+			fmt.Println("error unmarshallng JSON response")
+		}
+		return nil, err
+	}
+
+	return releases, nil
+
+}
+
+// createRelease accepts a release name, description, commit value, tag name, target_commitish
+func createRelease(auth *UserAuth, gURL *gitURL, tag, tagMessage, commitish string, draft, prerelease bool) (*release, error) {
+	// TEMP RELEASES URL HERE; LEARN TO TEMPLATE AND USE githubEndpoint.ReleasesURL
+	releasesURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/releases", gURL.organization, gURL.repository)
+
+	headers := make(map[string]string)
+
+	headers["Authorization"] = fmt.Sprintf("%s: %s", auth.TokenType, auth.AccessToken)
+	req, err := newPostRequest(releasesURL, url.Values{}, headers)
+	if err != nil {
+		fmt.Printf("+++ HTTP REQUEST RESPONSE +++")
+		fmt.Printf("%+v\n", req)
+		return nil, err
+	}
+
+	return &release{}, nil
+}
+
+type releaseClaim struct {
+	TagName         string `json:"tag_name"`
+	TargetCommitish string `json:"target_commitish,omitempty"`
+	Name            string `json:"name"`
+	Body            string `json:"body"`
+	Draft           bool   `json:"draft"`
+	Prerelease      bool   `json:"prerelease"`
+}
+
+type release struct {
+	URL             *url.URL `json:"url"`
+	HTMLURL         *url.URL `json:"html_url"`
+	AssetsURL       *url.URL `json:"asset_url"`
+	TarballURL      *url.URL `json:"tarball_url"`
+	ZipballURL      *url.URL `json:"zipball_url"`
+	ID              int      `json:"id"`
+	NodeID          string   `json:"node_id"`
+	TagName         string   `json:"tag_name"`
+	TargetCommitish string   `json:"target_commitish"`
+	Name            string   `json:"name"`
+	Body            string   `json:"body"`
+	Draft           bool     `json:"draft"`
+	Prerelease      bool     `json:"prerelease"`
+	CreatedAt       string   `json:"created_at"`
+	PublishedAt     string   `json:"published_at"`
+	Author          *user    `json:"author"`
+	Assets          []asset  `json:"assets"`
+}
+
+type asset struct {
+}
+
+type user interface {
 }
