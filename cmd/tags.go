@@ -18,7 +18,6 @@ limitations under the License.
 package cmd
 
 import (
-	"errors"
 	"fmt"
 	"regexp"
 	"time"
@@ -29,31 +28,32 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
 )
 
-func tagExists(tag string, repo *git.Repository) (bool, error) {
-
+func getTagFromString(tag string, repo *git.Repository) (*object.Tag, error) {
 	tagFoundError := "tag exists"
+	var tagObj *object.Tag
 
 	tags, err := repo.TagObjects()
-
 	if err != nil {
-		return false, err
+		return nil, err
 	}
-
-	res := false
 
 	err = tags.ForEach(func(t *object.Tag) error {
 		if t.Name == tag {
-			res = true
+			// User-provided tag found in repo already
+			tagObj = t
 			return fmt.Errorf(tagFoundError)
 		}
 		return nil
 	})
 
+	// If there are any errors that aren't specificially tagFoundErrors
+	// return, nothing and the error
 	if err != nil && err.Error() != tagFoundError {
-		return false, err
+		return nil, err
 	}
 
-	return res, nil
+	// Return the found tag
+	return tagObj, nil
 }
 
 func setTag(repo *git.Repository, tag string, message string, tagger *object.Signature) (bool, error) {
@@ -142,25 +142,11 @@ func stripComments(s string) string {
 
 }
 
-// createTag checks if a tag exists, creates a new one with a user-provided annotation if not
+// creates a tag a user-provided annotation
 func createTag(repo *git.Repository) error {
+	fmt.Println("GOT HERE ++++++++++++++++++++")
 	// Get the repoConfig to find the username and email
 	repoConfig, err := repo.ConfigScoped(config.GlobalScope)
-
-	// Check to see if the tag exists
-	// If it does not, continue on to create the tag
-	// If it does, prompt the user if they want to use the existing tag or bail
-	alreadyTagged, _ := tagExists(tag, repo)
-	if alreadyTagged {
-		c := confirm("Tag already exists. Continue using exising tag?")
-		if !c {
-			// Do not continue
-			return errors.New("tag exists; execution cancelled by user")
-		}
-
-		// Return, no need to create a new tag
-		return nil
-	}
 
 	// Prompt for a tag annotation message if one was not provided
 	if tagMessage == "" {
@@ -173,6 +159,7 @@ func createTag(repo *git.Repository) error {
 
 	tagMessage = stripComments(tagMessage)
 
+	fmt.Println("GOT TO SET TAG ++++++++++++++++++++")
 	tagged, err := setTag(
 		repo,
 		tag,
@@ -188,6 +175,7 @@ func createTag(repo *git.Repository) error {
 	}
 
 	if tagged {
+		fmt.Println("GOT TO PUSH TAG ++++++++++++++++++++")
 		err = pushTags(repo)
 
 		if err != nil {
