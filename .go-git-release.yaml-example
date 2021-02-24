@@ -12,4 +12,4 @@ verbose: true
 privateKey: id_ed25519
 
 # A Makefile target that generates artifacts for the release
-makeTarget: build_releas
+makeTarget: build_release
