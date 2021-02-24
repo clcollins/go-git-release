@@ -7,7 +7,6 @@ Project Status: **Extreme Alpha**
 Current Limitations:
 
 1. Currently, this does not create a release or upload the artifacts, it just tags, pushes the tag and builds the artifacts
-2. Currently, the "continue with an existing tag" option doesn't actually check out the tag
 
 ## Usage
 
