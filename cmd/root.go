@@ -35,6 +35,8 @@ var verbose bool
 var force bool
 var privateKey string
 var repositoryURL string
+var commitish string
+var branch string
 var tag string
 var tagMessage string
 var makeTarget string
@@ -78,14 +80,15 @@ a single command. At the moment, a Makefile with a "build" target is required.`,
 
 		verbose = viper.GetBool("verbose")
 		repositoryURL = viper.GetString("repositoryURL")
+		commitish = viper.GetString("commitish")
+		branch = viper.GetString("branch")
 		makeTarget = viper.GetString("makeTarget")
 
-		// TODO: This is not yet implemented
-		// privateKey = viper.GetString("privateKey")
-
-		err := validate()
-		if err != nil {
-			fmt.Printf("Error: %s\n\n", err)
+		errs := initialValidation()
+		if len(errs) != 0 {
+			for i := range errs {
+				fmt.Println(i)
+			}
 			cmd.Help()
 			os.Exit(1)
 		}
@@ -138,35 +141,51 @@ func init() {
 	// Don't prompt for anything; just do
 	rootCmd.PersistentFlags().BoolVarP(&force, "force", "f", false, "force; do not prompt for anything")
 
-	// TODO: This currently isn't utilized, as the SSH agent is the connection method
-	// TODO: add a way to override and provide the key
-	// Path to private key; defaults to "id_rsa"
-	// rootCmd.PersistentFlags().StringVarP(&privateKey, "privateKey", "k", "id_rsa", "SSH private key to use for authentication")
-
 	// TODO: Do we need this? If we're cloning the repo to a temp dir, it'll always be "origin".
 	// TODO: Or do we want to act on a clone in the cwd?
 	// Name of git remote to tag/push/release; "defaults to upstream"
 	// rootCmd.PersistentFlags().StringVarP(&remote, "remote", "R", "upstream", "git remote to act on")
 
+	// Repository; required
+	rootCmd.PersistentFlags().StringVarP(&repositoryURL, "repositoryURL", "r", "", "repository url")
+
+	// Commitish value to use as the basis for the relase
+	rootCmd.PersistentFlags().StringVarP(
+		&commitish,
+		"commitish",
+		"C",
+		"",
+		"(optional) git commitish object to use for the tag/release; "+
+			"if left blank, the latest commit from the specified branch will be used; "+
+			"if a tag is provided, the commit for that tag will be used, but the tag itself will not",
+	)
+
+	// The branch to use if the commitish is not provided; defaults to the repository default branch
+	rootCmd.PersistentFlags().StringVarP(
+		&branch,
+		"branch",
+		"b",
+		"",
+		"if commitish is not provided, the latest commit from this branch is used for the release (default is the repository default)",
+	)
+
 	// Tag name; required
 	rootCmd.PersistentFlags().StringVarP(&tag, "tag", "t", "", "tag to create or use for the release")
+	rootCmd.MarkPersistentFlagRequired("tag")
 
 	// Tag message; optional - will prompt otherwise
 	rootCmd.PersistentFlags().StringVarP(&tagMessage, "tagMessage", "m", "", "annotated tag message")
 
-	// Repository; required
-	rootCmd.PersistentFlags().StringVarP(&repositoryURL, "repositoryURL", "r", "", "repository url")
-
-	// Make target for build; optional (defaults to "build")
+	// Make target for build; optional (defaults to "buildRelease")
 	rootCmd.PersistentFlags().StringVarP(&makeTarget, "makeTarget", "M", "buildRelease", "make target to build artifacts")
 
+	// Bind these values to viper
 	viper.BindPFlag("verbose", rootCmd.PersistentFlags().Lookup("verbose"))
 	viper.BindPFlag("force", rootCmd.PersistentFlags().Lookup("force"))
 	viper.BindPFlag("repositoryURL", rootCmd.PersistentFlags().Lookup("repositoryURL"))
+	viper.BindPFlag("commitish", rootCmd.PersistentFlags().Lookup("commitish"))
+	viper.BindPFlag("branch", rootCmd.PersistentFlags().Lookup("branch"))
 	viper.BindPFlag("makeTarget", rootCmd.PersistentFlags().Lookup("makeTarget"))
-
-	// TODO: this is currently not impelemented
-	// viper.BindPFlag("privateKey", rootCmd.PersistentFlags().Lookup("privateKey"))
 
 }
 
@@ -193,20 +212,55 @@ func initConfig() {
 	// If a config file is found, read it in.
 	if err := viper.ReadInConfig(); err == nil {
 		fmt.Println("Using config file:", viper.ConfigFileUsed())
+	} else {
+		if verbose {
+			fmt.Println(err)
+			os.Exit(1)
+		}
 	}
 }
 
-func validate() error {
-	m := map[string]string{
-		"repositoryURL": repositoryURL,
-		"tag":           tag,
+// validate if enough info is provided to work
+// Precidence:
+//   * RepositoryURL is required
+//   * If a commitish is provided and is a tag, that is all
+//   * If a commitish is provided and is not a tag
+//     * tag is required; tag message is required or will be prompted
+//   * If commitish is NOT provided:
+//     * tag is required; tag message is required or will be prompted
+//     * branch is optional and defaults to the default repo branch
+
+// pre-clone, we can only check repositoryURL
+func initialValidation() []error {
+	e := make([]error, 0)
+
+	// repositoryURL is required
+	if repositoryURL == "" {
+		e = appendErr(e, "repositoryURL")
+	}
+	return e
+}
+
+// post-clone, we can check tags
+func postCloneValidation() []error {
+	e := make([]error, 0)
+
+	if commitishIsTag(commitish) {
+		return e
 	}
 
-	for k, v := range m {
-		if v == "" {
-			return fmt.Errorf("%s is required", k)
-		}
+	if tag == "" {
+		e = appendErr(e, "tag")
 	}
 
-	return nil
+	return e
+}
+
+func commitishIsTag(commitish string) bool {
+	// git list tags, see if match
+	return false
+}
+
+func appendErr(e []error, s string) []error {
+	return append(e, fmt.Errorf("%s is required", s))
 }

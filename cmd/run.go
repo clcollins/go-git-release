@@ -27,6 +27,7 @@ import (
 	"strings"
 
 	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
 )
 
@@ -88,7 +89,7 @@ func confirm(s string) bool {
 }
 
 // cloneRepo clones the provided git repository into the provided directory using the SSH Agent "git" identity
-func cloneRepo(url, dir string) (*git.Repository, error) {
+func cloneRepo(url, dir, branch string) (*git.Repository, error) {
 
 	if verbose {
 		fmt.Printf("cloning %s into %s", url, dir)
@@ -106,6 +107,24 @@ func cloneRepo(url, dir string) (*git.Repository, error) {
 		Auth:     auth,
 	}
 
+	// Convert the branch strings to a real ReferenceName type
+	// IF A TAG, the path is "tag/<tag>"
+	// if branch != "" {
+	// 	referenceName := plumbing.NewBranchReferenceName(branch)
+	// 	cloneOpts.ReferenceName = referenceName
+	// 	cloneOpts.SingleBranch = true
+	// } else {
+	// 	referenceName := plumbing.HEAD
+	// 	cloneOpts.ReferenceName = referenceName
+	// }
+
+	// Validate the options we are going to pass into the PlainClone function
+	err := cloneOpts.Validate()
+	if err != nil {
+		return nil, err
+	}
+
+	// Clone the repository to the temporary directory
 	repo, err := git.PlainClone(dir, false, cloneOpts)
 
 	if err != nil {
@@ -138,44 +157,61 @@ func publicKey(keyname string) (*ssh.PublicKeys, error) {
 }
 
 func run() error {
-	var dryrun bool = true
-
 	// parse the user-provided git url
 	gURL, err := parseGitURL(repositoryURL)
 	if err != nil {
 		return err
 	}
 
-	if !dryrun {
-		// Create a tempDir to clone into
-		tempDir, err := createTempDir()
+	// Create a tempDir to clone into
+	tempDir, err := createTempDir()
 
-		if err != nil {
-			return fmt.Errorf("cannot create temporary directory: %s", err)
+	if err != nil {
+		return fmt.Errorf("cannot create temporary directory: %s", err)
+	}
+
+	// Cleanup tempDir
+	defer os.Remove(tempDir)
+
+	// Clone the remote
+	// If there is a branch, check that branch out specifically
+	repo, err := cloneRepo(gURL.raw, tempDir, branch)
+
+	if err != nil {
+		return fmt.Errorf("cannot clone repository: %s", err)
+	}
+
+	errs := postCloneValidation()
+	if len(errs) != 0 {
+		for i := range errs {
+			fmt.Println(i)
 		}
+		return fmt.Errorf("missing information")
+	}
 
-		// Cleanup tempDir
-		defer os.Remove(tempDir)
+	// Checkout commitish, if provided
+	repo, err = checkoutCommitish(repo, commitish)
+	if err != nil {
+		return err
+	}
 
-		// Clone the remote
-		repo, err := cloneRepo(gURL.raw, tempDir)
+	log, err := repo.Log(&git.LogOptions{})
+	if err != nil {
+		return err
+	}
+	fmt.Printf("LOG: %s", log)
+	os.Exit(1)
 
-		if err != nil {
-			return fmt.Errorf("cannot clone repository: %s", err)
-		}
+	// Create the tag
+	err = createTag(repo)
+	if err != nil {
+		return fmt.Errorf("cannot create tag: %s", err)
+	}
 
-		// Create the tag
-		err = createTag(repo)
-		if err != nil {
-			return fmt.Errorf("cannot create tag: %s", err)
-		}
-
-		// Run a build
-		err = makeBuild(tempDir)
-		if err != nil {
-			return fmt.Errorf("failed building artifacts: %s", err)
-		}
-
+	// Run a build
+	err = makeBuild(tempDir)
+	if err != nil {
+		return fmt.Errorf("failed building artifacts: %s", err)
 	}
 
 	// Create a release
@@ -260,4 +296,42 @@ func parseGitURL(repositoryURL string) (*gitURL, error) {
 
 func formatURLPath(matches []string, re *regexp.Regexp) string {
 	return fmt.Sprintf(matches[re.SubexpIndex("pathSeparator")] + matches[re.SubexpIndex("organization")] + "/" + matches[re.SubexpIndex("repository")] + matches[re.SubexpIndex("suffix")])
+}
+
+func checkoutCommitish(repo *git.Repository, commitish string) (*git.Repository, error) {
+
+	ref, err := repo.Head()
+	if err != nil {
+		fmt.Println("HEAD 1")
+		return repo, err
+	}
+
+	fmt.Println(ref.Hash())
+
+	tree, err := repo.Worktree()
+	if err != nil {
+		fmt.Println("WORKTREE 1")
+		return repo, err
+	}
+
+	// Set the commitish hash in the Checkout options
+	// Hash is mutually exclusive with Branch, so set Branch to an empty string
+	err = tree.Checkout(&git.CheckoutOptions{
+		Hash: plumbing.NewHash(commitish),
+	})
+	if err != nil {
+		fmt.Println("CHECKOUT 1")
+		return repo, err
+	}
+
+	ref, err = repo.Head()
+	if err != nil {
+		fmt.Println("HEAD 2")
+		return repo, err
+	}
+
+	fmt.Printf("REF HASH: %s\n", ref.Hash())
+
+	return repo, nil
+
 }
