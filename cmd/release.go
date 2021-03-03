@@ -141,9 +141,9 @@ func newPostRequest(url string, params url.Values, headers ...map[string]string)
 	return r, nil
 }
 
-// retrieveAccessToken calls into the userAuthURL to check and see if the user has authorized
+// getAccessToken calls into the userAuthURL to check and see if the user has authorized
 // this device to act on their behalf, and returns a response
-func retrieveAccessToken(req *http.Request) (*UserAuth, bool, error) {
+func getAccessToken(req *http.Request) (*UserAuth, bool, error) {
 
 	// make the request
 	body, err := makeHTTPRequest(req)
@@ -257,19 +257,17 @@ func pollForAccessToken(userAuthURL, clientID, deviceCode, grantType string, exp
 	params.Add("device_code", deviceCode)
 	params.Add("grant_type", grantType)
 
-	// create an http.Request
-	req, err := newPostRequest(userAuthURL, params)
-	if err != nil {
-		return nil, err
-	}
-
 	for {
 		select {
 		case <-timeout:
-			fmt.Println("timeout")
 			return nil, errors.New("timeout reached")
 		case <-ticker:
-			auth, ok, err := retrieveAccessToken(req)
+			// create an http.Request
+			req, err := newPostRequest(userAuthURL, params)
+			if err != nil {
+				return nil, err
+			}
+			auth, ok, err := getAccessToken(req)
 			if ok {
 				return auth, nil
 			}
@@ -380,6 +378,7 @@ func getReleases(gURL *gitURL) ([]release, error) {
 
 	// TEMP RELEASES URL HERE; LEARN TO TEMPLATE AND USE githubEndpoint.ReleasesURL
 	releasesURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/releases", gURL.organization, gURL.repository)
+
 	req, err := newGetRequest(releasesURL, url.Values{})
 	if err != nil {
 		return releases, err
@@ -413,10 +412,11 @@ func createRelease(auth *UserAuth, gURL *gitURL, tag, tagMessage, commitish stri
 	headers["Authorization"] = fmt.Sprintf("%s: %s", auth.TokenType, auth.AccessToken)
 	req, err := newPostRequest(releasesURL, url.Values{}, headers)
 	if err != nil {
-		fmt.Printf("+++ HTTP REQUEST RESPONSE +++")
-		fmt.Printf("%+v\n", req)
 		return nil, err
 	}
+
+	fmt.Printf("++++++++++++++++++")
+	fmt.Printf("%+v\n", req)
 
 	return &release{}, nil
 }

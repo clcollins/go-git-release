@@ -144,12 +144,12 @@ func stripComments(s string) string {
 
 // creates a tag a user-provided annotation
 func createTag(repo *git.Repository) error {
-	fmt.Println("GOT HERE ++++++++++++++++++++")
 	// Get the repoConfig to find the username and email
 	repoConfig, err := repo.ConfigScoped(config.GlobalScope)
 
 	// Prompt for a tag annotation message if one was not provided
 	if tagMessage == "" {
+		note(fmt.Sprint("No tag message provided"))
 		input, err := captureInputFromEditor(getPreferredEditorFromEnvironment)
 		if err != nil {
 			return err
@@ -159,7 +159,6 @@ func createTag(repo *git.Repository) error {
 
 	tagMessage = stripComments(tagMessage)
 
-	fmt.Println("GOT TO SET TAG ++++++++++++++++++++")
 	tagged, err := setTag(
 		repo,
 		tag,
@@ -175,7 +174,7 @@ func createTag(repo *git.Repository) error {
 	}
 
 	if tagged {
-		fmt.Println("GOT TO PUSH TAG ++++++++++++++++++++")
+		note(fmt.Sprint("Pushing tag to remote"))
 		err = pushTags(repo)
 
 		if err != nil {

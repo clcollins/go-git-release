@@ -32,6 +32,12 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
 )
 
+func note(msg string) {
+	if verbose {
+		fmt.Println(msg)
+	}
+}
+
 var emptyCommitarray = make([]byte, 20)
 
 func createTempDir() (string, error) {
@@ -238,8 +244,6 @@ func run() error {
 		return fmt.Errorf("failed building artifacts: %s", err)
 	}
 
-	os.Exit(1)
-
 	// Create a release
 	// request user & device codes
 	var scope string = ""
@@ -262,13 +266,12 @@ func run() error {
 		authResponse.ExpiresIn,
 		authResponse.Interval,
 	)
+
 	if err != nil {
 		return fmt.Errorf("failed checking for authorization and retrieving access token: %s", err)
 	}
 
-	// fmt.Println(userAuthResponse.AccessToken)
 	fmt.Println(userAuthResponse.TokenType)
-	// fmt.Println(userAuthResponse.Scope)
 
 	releases, err := getReleases(gURL)
 	fmt.Printf("RELEASES: %v\n", releases)
