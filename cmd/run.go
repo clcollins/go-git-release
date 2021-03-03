@@ -274,10 +274,14 @@ func run() error {
 	fmt.Println(userAuthResponse.TokenType)
 
 	releases, err := getReleases(gURL)
+	if err != nil {
+		return fmt.Errorf("failed retrieving list of releases: %s", err)
+	}
+
 	fmt.Printf("RELEASES: %v\n", releases)
 
-	resp, err := createRelease(userAuthResponse, gURL, tag, tagMessage, "", false, false)
-	fmt.Printf("CREATE RELEASE RESPONSE: %+v\n", resp)
+	// resp, err := createRelease(userAuthResponse, gURL, tag, tagMessage, "", false, false)
+	// fmt.Printf("CREATE RELEASE RESPONSE: %+v\n", resp)
 
 	// List releases (does one exist?)
 	// https://docs.github.com/en/free-pro-team@latest/rest/reference/repos#list-releases

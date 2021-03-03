@@ -374,7 +374,8 @@ func openbrowser(url string) {
 
 // getReleases retrieves a slice of releases from the gitURL
 func getReleases(gURL *gitURL) ([]release, error) {
-	releases := make([]release, 0)
+	var releases []release
+	result := make([]map[string]interface{}, 0)
 
 	// TEMP RELEASES URL HERE; LEARN TO TEMPLATE AND USE githubEndpoint.ReleasesURL
 	releasesURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/releases", gURL.organization, gURL.repository)
@@ -389,13 +390,9 @@ func getReleases(gURL *gitURL) ([]release, error) {
 		return releases, err
 	}
 
-	// unmarshal the response
-	err = json.Unmarshal(body, &releases)
+	err = json.Unmarshal(body, &result)
 	if err != nil {
-		if verbose {
-			fmt.Println("error unmarshallng JSON response")
-		}
-		return nil, err
+		return releases, err
 	}
 
 	return releases, nil
@@ -410,13 +407,10 @@ func createRelease(auth *UserAuth, gURL *gitURL, tag, tagMessage, commitish stri
 	headers := make(map[string]string)
 
 	headers["Authorization"] = fmt.Sprintf("%s: %s", auth.TokenType, auth.AccessToken)
-	req, err := newPostRequest(releasesURL, url.Values{}, headers)
+	_, err := newPostRequest(releasesURL, url.Values{}, headers)
 	if err != nil {
 		return nil, err
 	}
-
-	fmt.Printf("++++++++++++++++++")
-	fmt.Printf("%+v\n", req)
 
 	return &release{}, nil
 }
@@ -431,11 +425,11 @@ type releaseClaim struct {
 }
 
 type release struct {
-	URL             *url.URL `json:"url"`
-	HTMLURL         *url.URL `json:"html_url"`
-	AssetsURL       *url.URL `json:"asset_url"`
-	TarballURL      *url.URL `json:"tarball_url"`
-	ZipballURL      *url.URL `json:"zipball_url"`
+	URL             *url.URL `json:"url,string"`
+	HTMLURL         *url.URL `json:"html_url,string"`
+	AssetsURL       *url.URL `json:"asset_url,string"`
+	TarballURL      *url.URL `json:"tarball_url,string"`
+	ZipballURL      *url.URL `json:"zipball_url,string"`
 	ID              int      `json:"id"`
 	NodeID          string   `json:"node_id"`
 	TagName         string   `json:"tag_name"`
