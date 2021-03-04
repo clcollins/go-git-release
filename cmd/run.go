@@ -99,11 +99,6 @@ func confirm(s string) bool {
 
 // cloneRepo clones the provided git repository into the provided directory using the SSH Agent "git" identity
 func cloneRepo(url, dir, branch string) (*git.Repository, error) {
-
-	if verbose {
-		fmt.Printf("cloning %s into %s\n", url, dir)
-	}
-
 	auth, keyErr := ssh.NewSSHAgentAuth("git")
 
 	if keyErr != nil {
@@ -168,14 +163,19 @@ func publicKey(keyname string) (*ssh.PublicKeys, error) {
 
 func run() error {
 	// parse the user-provided git url
+	if verbose {
+		fmt.Println("Parsing Git URL")
+	}
 	gURL, err := parseGitURL(repositoryURL)
 	if err != nil {
 		return err
 	}
 
 	// Create a tempDir to clone into
+	if verbose {
+		fmt.Println("Creating temporary directory")
+	}
 	tempDir, err := createTempDir()
-
 	if err != nil {
 		return fmt.Errorf("cannot create temporary directory: %s", err)
 	}
@@ -185,12 +185,17 @@ func run() error {
 
 	// Clone the remote
 	// If there is a branch, check that branch out specifically
+	if verbose {
+		fmt.Printf("Cloning %s into %s\n", gURL.raw, tempDir)
+	}
 	repo, err := cloneRepo(gURL.raw, tempDir, branch)
-
 	if err != nil {
 		return fmt.Errorf("cannot clone repository: %s", err)
 	}
 
+	if verbose {
+		fmt.Println("Validating cloned repository")
+	}
 	errs := postCloneValidation()
 	if len(errs) != 0 {
 		for i := range errs {
@@ -219,6 +224,9 @@ func run() error {
 
 		// If proceed, then checkout the existing Tag target commiit
 		// No need to create a tag - already exists
+		if verbose {
+			fmt.Printf("Checking out Tag %s\n", tagObj.Name)
+		}
 		repo, err = checkoutCommitish(repo, tagObj.Target)
 		if err != nil {
 			return err
@@ -227,11 +235,17 @@ func run() error {
 		// Checkout the commitish, if provided, to create the tag with
 		// otherwise it'll be either head, or the provided branch, from
 		// the clone function above
+		if verbose {
+			fmt.Printf("Checking out Commit %s\n", commitish)
+		}
 		repo, err = checkoutCommitish(repo, plumbing.NewHash(commitish))
 		if err != nil {
 			return err
 		}
 		// Create the tag
+		if verbose {
+			fmt.Printf("Creating Tag %s\n", tag)
+		}
 		err = createTag(repo)
 		if err != nil {
 			return fmt.Errorf("cannot create tag: %s", err)
@@ -239,6 +253,9 @@ func run() error {
 	}
 
 	// Run a build
+	if verbose {
+		fmt.Println("Building artifacts")
+	}
 	err = makeBuild(tempDir)
 	if err != nil {
 		return fmt.Errorf("failed building artifacts: %s", err)
@@ -246,6 +263,9 @@ func run() error {
 
 	// Create a release
 	// request user & device codes
+	if verbose {
+		fmt.Println("Authorizing device")
+	}
 	var scope string = ""
 	authResponse, err := requestDeviceAndUserCodes(githubEndpoint.DeviceAuthURL, clientID, scope)
 	if err != nil {
@@ -258,6 +278,9 @@ func run() error {
 	openbrowser(authResponse.VerificationURI)
 
 	// poll for auth status
+	if verbose {
+		fmt.Println("Polling for access token")
+	}
 	userAuthResponse, err := pollForAccessToken(
 		githubEndpoint.TokenURL,
 		clientID,
@@ -266,27 +289,45 @@ func run() error {
 		authResponse.ExpiresIn,
 		authResponse.Interval,
 	)
-
 	if err != nil {
 		return fmt.Errorf("failed checking for authorization and retrieving access token: %s", err)
 	}
 
-	fmt.Println(userAuthResponse.TokenType)
-
+	// List releases (does one exist?)
+	// https://docs.github.com/en/free-pro-team@latest/rest/reference/repos#list-releases
+	if verbose {
+		fmt.Println("Getting existing releases")
+	}
 	releases, err := getReleases(gURL)
 	if err != nil {
 		return fmt.Errorf("failed retrieving list of releases: %s", err)
 	}
 
-	fmt.Printf("RELEASES: %v\n", releases)
+	if verbose {
+		fmt.Println("Checking if release already exists")
+		for _, release := range *releases {
+			fmt.Printf("Found release: %s\n", *release.Name)
+			if tag == *release.Name {
+				return fmt.Errorf("release with tag \"%s\" already exists", tag)
+			}
+		}
+	}
 
-	// resp, err := createRelease(userAuthResponse, gURL, tag, tagMessage, "", false, false)
-	// fmt.Printf("CREATE RELEASE RESPONSE: %+v\n", resp)
-
-	// List releases (does one exist?)
-	// https://docs.github.com/en/free-pro-team@latest/rest/reference/repos#list-releases
 	// Create a Release
 	// https://docs.github.com/en/free-pro-team@latest/rest/reference/repos#create-a-release
+	if verbose {
+		fmt.Println("Creating release")
+	}
+	resp, err := createRelease(userAuthResponse, gURL, tag, tagMessage, "", false, false)
+	if err != nil {
+		return fmt.Errorf("failed creating release: %s", err)
+	}
+	fmt.Printf("CREATE RELEASE RESPONSE: %+v\n", resp)
+
+	if verbose {
+		fmt.Println("Uploading release assets")
+	}
+
 	// Upload Release Assets
 	// https://docs.github.com/en/free-pro-team@latest/rest/reference/repos#upload-a-release-asset
 	return nil

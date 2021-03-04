@@ -149,7 +149,9 @@ func createTag(repo *git.Repository) error {
 
 	// Prompt for a tag annotation message if one was not provided
 	if tagMessage == "" {
-		note(fmt.Sprint("No tag message provided"))
+		if verbose {
+			fmt.Println("No tag message provided")
+		}
 		input, err := captureInputFromEditor(getPreferredEditorFromEnvironment)
 		if err != nil {
 			return err
@@ -174,7 +176,9 @@ func createTag(repo *git.Repository) error {
 	}
 
 	if tagged {
-		note(fmt.Sprint("Pushing tag to remote"))
+		if verbose {
+			fmt.Println("Pushing tag to remote")
+		}
 		err = pushTags(repo)
 
 		if err != nil {

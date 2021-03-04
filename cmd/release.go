@@ -27,6 +27,7 @@ import (
 	"net/url"
 	"os/exec"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
@@ -153,58 +154,29 @@ func getAccessToken(req *http.Request) (*UserAuth, bool, error) {
 
 	// unmarshal the respone
 	var auth = &UserAuth{}
-	err = json.Unmarshal(body, &auth)
-	if err != nil {
-		if verbose {
-			fmt.Println("error unmarshallng JSON response")
-		}
+	if err = json.Unmarshal(body, &auth); err != nil {
 		return nil, false, err
 	}
 
 	// unmarshal the raw data
-	err = json.Unmarshal(body, &auth.raw)
-	if err != nil {
-		if verbose {
-			fmt.Println("error unmarshalling raw JSON response")
-		}
+	if err = json.Unmarshal(body, &auth.raw); err != nil {
 		return nil, false, err
 	}
 
 	switch e := auth.raw["error"]; e {
 	case "authorization_pending":
-		if verbose {
-			fmt.Println(e)
-		}
 		return auth, false, nil
 	case "slow_down":
-		if verbose {
-			fmt.Println(e)
-		}
 		return auth, false, fmt.Errorf("%v", e)
 	case "expired_token":
-		if verbose {
-			fmt.Println(e)
-		}
 		return auth, false, fmt.Errorf("%v", e)
 	case "unsupported_grant_type":
-		if verbose {
-			fmt.Println(e)
-		}
 		return auth, false, fmt.Errorf("%v", e)
 	case "incorrect_client_credentials":
-		if verbose {
-			fmt.Println(e)
-		}
 		return auth, false, fmt.Errorf("%v", e)
 	case "incorrect_device_code":
-		if verbose {
-			fmt.Println(e)
-		}
 		return auth, false, fmt.Errorf("%v", e)
 	case "access_denied":
-		if verbose {
-			fmt.Println(e)
-		}
 		return auth, false, fmt.Errorf("%v", e)
 	}
 
@@ -218,26 +190,17 @@ func makeHTTPRequest(req *http.Request) ([]byte, error) {
 	// create a context and execute the http request
 	r, err := ctxhttp.Do(context.TODO(), nil, req)
 	if err != nil {
-		if verbose {
-			fmt.Println("error executing http request")
-		}
 		return nil, err
 	}
 
 	// check to see if the initial device flow request succeded
 	if code := r.StatusCode; code != 200 {
-		if verbose {
-			fmt.Printf("error bad response code: %d\n", code)
-		}
 		return nil, fmt.Errorf("failed device auth initiation: %s", r.Status)
 	}
 
 	// read the body of the returned request
 	body, err := ioutil.ReadAll(io.LimitReader(r.Body, 1<<20))
 	if err != nil {
-		if verbose {
-			fmt.Println("error ready response body")
-		}
 		return nil, err
 	}
 
@@ -311,20 +274,12 @@ func requestDeviceAndUserCodes(deviceAuthURL, clientID, scope string) (*DeviceAu
 
 	// unmarshal the response
 	var auth = &DeviceAuth{}
-	err = json.Unmarshal(body, &auth)
-	if err != nil {
-		if verbose {
-			fmt.Println("error unmarshallng JSON response")
-		}
+	if err = json.Unmarshal(body, &auth); err != nil {
 		return nil, err
 	}
 
 	// unmarshal the raw data
-	err = json.Unmarshal(body, &auth.raw)
-	if err != nil {
-		if verbose {
-			fmt.Println("error unmarshalling raw JSON response")
-		}
+	if err = json.Unmarshal(body, &auth.raw); err != nil {
 		return nil, err
 	}
 
@@ -372,31 +327,34 @@ func openbrowser(url string) {
 
 }
 
-// getReleases retrieves a slice of releases from the gitURL
-func getReleases(gURL *gitURL) ([]release, error) {
-	var releases []release
-	result := make([]map[string]interface{}, 0)
+type releases []release
 
+// getReleases retrieves a slice of releases from the gitURL
+func getReleases(gURL *gitURL) (*releases, error) {
+	var releasesList releases
 	// TEMP RELEASES URL HERE; LEARN TO TEMPLATE AND USE githubEndpoint.ReleasesURL
 	releasesURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/releases", gURL.organization, gURL.repository)
 
 	req, err := newGetRequest(releasesURL, url.Values{})
 	if err != nil {
-		return releases, err
+		return &releasesList, err
 	}
 
 	body, err := makeHTTPRequest(req)
 	if err != nil {
-		return releases, err
+		return &releasesList, err
 	}
 
-	err = json.Unmarshal(body, &result)
-	if err != nil {
-		return releases, err
+	if err = json.Unmarshal(body, &releasesList); err != nil {
+		return &releasesList, err
 	}
 
-	return releases, nil
+	// unmarshal the raw data
+	if err = json.Unmarshal(body, &releasesList); err != nil {
+		return nil, err
+	}
 
+	return &releasesList, nil
 }
 
 // createRelease accepts a release name, description, commit value, tag name, target_commitish
@@ -406,13 +364,35 @@ func createRelease(auth *UserAuth, gURL *gitURL, tag, tagMessage, commitish stri
 
 	headers := make(map[string]string)
 
+	params := &url.Values{}
+	params.Add("tag_name", tag)
+	params.Add("name", tag)
+	params.Add("body", tagMessage)
+	params.Add("draft", strconv.FormatBool(draft))
+	params.Add("prerelease", strconv.FormatBool(prerelease))
+
 	headers["Authorization"] = fmt.Sprintf("%s: %s", auth.TokenType, auth.AccessToken)
-	_, err := newPostRequest(releasesURL, url.Values{}, headers)
+	req, err := newPostRequest(releasesURL, url.Values{}, headers)
 	if err != nil {
 		return nil, err
 	}
 
-	return &release{}, nil
+	// make the request
+	body, err := makeHTTPRequest(req)
+	if err != nil {
+		return nil, err
+	}
+
+	var newRelease release
+	if err := json.Unmarshal(body, &newRelease); err != nil {
+		return nil, err
+	}
+	// unmarshal the raw data
+	if err = json.Unmarshal(body, &newRelease.raw); err != nil {
+		return nil, err
+	}
+
+	return &newRelease, nil
 }
 
 type releaseClaim struct {
@@ -422,29 +402,47 @@ type releaseClaim struct {
 	Body            string `json:"body"`
 	Draft           bool   `json:"draft"`
 	Prerelease      bool   `json:"prerelease"`
+	raw             map[string]interface{}
 }
 
 type release struct {
-	URL             *url.URL `json:"url,string"`
-	HTMLURL         *url.URL `json:"html_url,string"`
-	AssetsURL       *url.URL `json:"asset_url,string"`
-	TarballURL      *url.URL `json:"tarball_url,string"`
-	ZipballURL      *url.URL `json:"zipball_url,string"`
-	ID              int      `json:"id"`
-	NodeID          string   `json:"node_id"`
-	TagName         string   `json:"tag_name"`
-	TargetCommitish string   `json:"target_commitish"`
-	Name            string   `json:"name"`
-	Body            string   `json:"body"`
-	Draft           bool     `json:"draft"`
-	Prerelease      bool     `json:"prerelease"`
-	CreatedAt       string   `json:"created_at"`
-	PublishedAt     string   `json:"published_at"`
-	Author          *user    `json:"author"`
-	Assets          []asset  `json:"assets"`
+	TagName         *string `json:"tag_name,omitempty"`
+	TargetCommitish *string `json:"target_commitish,omitempty"`
+	Name            *string `json:"name,omitempty"`
+	Body            *string `json:"body,omitempty"`
+	Draft           *bool   `json:"draft,omitempty"`
+	Prerelease      *bool   `json:"prerelease,omitempty"`
+
+	ID          *int     `json:"id,omitempty"`
+	CreatedAt   *string  `json:"created_at,omitempty"`
+	PublishedAt *string  `json:"published_at,omitempty"`
+	URL         *string  `json:"url,omitempty"`
+	HTMLURL     *string  `json:"html_url,omitempty"`
+	AssetsURL   *string  `json:"asset_url,omitempty"`
+	Assets      []*asset `json:"assets,omitempty"`
+	UploadURL   *string  `json:"upload_url,omitempty"`
+	ZipballURL  *string  `json:"zipball_url,omitempty"`
+	TarballURL  *string  `json:"tarball_url,omitempty"`
+	Author      *user    `json:"author,omitempty"`
+	NodeID      *string  `json:"node_id,omitempty"`
+	raw         map[string]interface{}
 }
 
 type asset struct {
+	ID                 *int64  `json:"id,omitempty"`
+	URL                *string `json:"url,omitempty"`
+	Name               *string `json:"name,omitempty"`
+	Label              *string `json:"label,omitempty"`
+	State              *string `json:"state,omitempty"`
+	ContentType        *string `json:"content_type,omitempty"`
+	Size               *int    `json:"size,omitempty"`
+	DownloadCount      *int    `json:"download_count,omitempty"`
+	CreatedAt          *string `json:"created_at,omitempty"`
+	UpdatedAt          *string `json:"updated_at,omitempty"`
+	BrowserDownloadURL *string `json:"browser_download_url,omitempty"`
+	Uploader           *string `json:"uploader,omitempty"`
+	NodeID             *string `json:"node_id,omitempty"`
+	raw                map[string]interface{}
 }
 
 type user interface {
