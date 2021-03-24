@@ -32,6 +32,8 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
 )
 
+const scope = "repo"
+
 func note(msg string) {
 	if verbose {
 		fmt.Println(msg)
@@ -196,6 +198,7 @@ func run() error {
 	if verbose {
 		fmt.Println("Validating cloned repository")
 	}
+	// TODO: Flesh out the validation here
 	errs := postCloneValidation()
 	if len(errs) != 0 {
 		for i := range errs {
@@ -266,7 +269,7 @@ func run() error {
 	if verbose {
 		fmt.Println("Authorizing device")
 	}
-	var scope string = ""
+
 	authResponse, err := requestDeviceAndUserCodes(githubEndpoint.DeviceAuthURL, clientID, scope)
 	if err != nil {
 		return fmt.Errorf("failed requesting device and user codes from github: %s", err)

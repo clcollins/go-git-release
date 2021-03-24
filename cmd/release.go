@@ -125,7 +125,11 @@ func newPostRequest(url string, params url.Values, headers ...map[string]string)
 	}
 
 	// content is submitted as x-www-form-urlencoded; accepted back as JSON
-	r.Header.Set("Contet-Type", "application/x-www-form-urlencoded")
+	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	// TODO: test Github recommended Accept header
+	// Github recommended Accept header is: application/vnd.github.v3+json
+	// r.Header.Set("Accept", "application/vnd.github.v3+json")
 	r.Header.Set("Accept", "application/json")
 
 	// set any additional headers passed into the function
@@ -187,6 +191,9 @@ func getAccessToken(req *http.Request) (*UserAuth, bool, error) {
 // make HTTPRequest takes an http.Request, executes the request, checks for a 200
 // response, and reads the response body to a byte slice
 func makeHTTPRequest(req *http.Request) ([]byte, error) {
+
+	fmt.Println("DEBUG: beginning 'makeHTTPRequest'")
+
 	// create a context and execute the http request
 	r, err := ctxhttp.Do(context.TODO(), nil, req)
 	if err != nil {
@@ -194,10 +201,15 @@ func makeHTTPRequest(req *http.Request) ([]byte, error) {
 	}
 
 	// check to see if the initial device flow request succeded
+	// 422 is an unprocessable entity, anything else is unknown
+	if code := r.StatusCode; code == 404 {
+		return nil, fmt.Errorf("failed to authorize device: %s", r.Status)
+	}
 	if code := r.StatusCode; code != 200 {
-		return nil, fmt.Errorf("failed device auth initiation: %s", r.Status)
+		return nil, fmt.Errorf(r.Status)
 	}
 
+	fmt.Println("DEBUG: read response in 'makeHTTPRequest'")
 	// read the body of the returned request
 	body, err := ioutil.ReadAll(io.LimitReader(r.Body, 1<<20))
 	if err != nil {
@@ -364,24 +376,30 @@ func createRelease(auth *UserAuth, gURL *gitURL, tag, tagMessage, commitish stri
 
 	headers := make(map[string]string)
 
-	params := &url.Values{}
+	params := url.Values{}
 	params.Add("tag_name", tag)
-	params.Add("name", tag)
+	params.Add("name", "DEBUG TEST 1")
 	params.Add("body", tagMessage)
 	params.Add("draft", strconv.FormatBool(draft))
 	params.Add("prerelease", strconv.FormatBool(prerelease))
 
-	headers["Authorization"] = fmt.Sprintf("%s: %s", auth.TokenType, auth.AccessToken)
+	fmt.Printf("+%v\n", params)
+
+	headers["Authorization"] = fmt.Sprintf("%s %s", auth.TokenType, auth.AccessToken)
 	req, err := newPostRequest(releasesURL, url.Values{}, headers)
 	if err != nil {
 		return nil, err
 	}
+
+	fmt.Println("DEBUG: returned successfully from 'newPostRequest'")
 
 	// make the request
 	body, err := makeHTTPRequest(req)
 	if err != nil {
 		return nil, err
 	}
+
+	fmt.Println("DEBUG: returned successfully from 'makeHTTPRequest'")
 
 	var newRelease release
 	if err := json.Unmarshal(body, &newRelease); err != nil {
@@ -391,6 +409,8 @@ func createRelease(auth *UserAuth, gURL *gitURL, tag, tagMessage, commitish stri
 	if err = json.Unmarshal(body, &newRelease.raw); err != nil {
 		return nil, err
 	}
+
+	fmt.Println("DEBUG: returned successfully from JSON unmarshalling")
 
 	return &newRelease, nil
 }
