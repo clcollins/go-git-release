@@ -101,6 +101,50 @@ type UserAuth struct {
 	raw         map[string]interface{}
 }
 
+type releases []release
+type release struct {
+	TagName         *string `json:"tag_name,omitempty"`
+	TargetCommitish *string `json:"target_commitish,omitempty"`
+	Name            *string `json:"name,omitempty"`
+	Body            *string `json:"body,omitempty"`
+	Draft           *bool   `json:"draft,omitempty"`
+	Prerelease      *bool   `json:"prerelease,omitempty"`
+
+	ID          *int     `json:"id,omitempty"`
+	CreatedAt   *string  `json:"created_at,omitempty"`
+	PublishedAt *string  `json:"published_at,omitempty"`
+	URL         *string  `json:"url,omitempty"`
+	HTMLURL     *string  `json:"html_url,omitempty"`
+	AssetsURL   *string  `json:"asset_url,omitempty"`
+	Assets      []*asset `json:"assets,omitempty"`
+	UploadURL   *string  `json:"upload_url,omitempty"`
+	ZipballURL  *string  `json:"zipball_url,omitempty"`
+	TarballURL  *string  `json:"tarball_url,omitempty"`
+	Author      *user    `json:"author,omitempty"`
+	NodeID      *string  `json:"node_id,omitempty"`
+	raw         map[string]interface{}
+}
+
+type asset struct {
+	ID                 *int64  `json:"id,omitempty"`
+	URL                *string `json:"url,omitempty"`
+	Name               *string `json:"name,omitempty"`
+	Label              *string `json:"label,omitempty"`
+	State              *string `json:"state,omitempty"`
+	ContentType        *string `json:"content_type,omitempty"`
+	Size               *int    `json:"size,omitempty"`
+	DownloadCount      *int    `json:"download_count,omitempty"`
+	CreatedAt          *string `json:"created_at,omitempty"`
+	UpdatedAt          *string `json:"updated_at,omitempty"`
+	BrowserDownloadURL *string `json:"browser_download_url,omitempty"`
+	Uploader           *string `json:"uploader,omitempty"`
+	NodeID             *string `json:"node_id,omitempty"`
+	raw                map[string]interface{}
+}
+
+type user interface {
+}
+
 // newGetRequest creates an http.Request using the provided URL
 // and sets the Content-Type and Accept headers to values we can work with
 func newGetRequest(url string, params url.Values) (*http.Request, error) {
@@ -110,7 +154,7 @@ func newGetRequest(url string, params url.Values) (*http.Request, error) {
 	}
 
 	// content is submitted as x-www-form-urlencoded; accepted back as JSON
-	r.Header.Set("Contet-Type", "application/x-www-form-urlencoded")
+	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	r.Header.Set("Accept", "application/json")
 
 	return r, nil
@@ -200,6 +244,8 @@ func makeHTTPRequest(req *http.Request) ([]byte, error) {
 		return nil, err
 	}
 
+	fmt.Println("DEBUG: ctxhttp.Do called in 'makeHTTPRequest'")
+
 	// check to see if the initial device flow request succeded
 	// 422 is an unprocessable entity, anything else is unknown
 	if code := r.StatusCode; code == 404 {
@@ -208,6 +254,8 @@ func makeHTTPRequest(req *http.Request) ([]byte, error) {
 	if code := r.StatusCode; code != 200 {
 		return nil, fmt.Errorf(r.Status)
 	}
+
+	fmt.Println("DEBUG: r.StatusCode processed in 'makeHTTPRequest'")
 
 	fmt.Println("DEBUG: read response in 'makeHTTPRequest'")
 	// read the body of the returned request
@@ -298,28 +346,6 @@ func requestDeviceAndUserCodes(deviceAuthURL, clientID, scope string) (*DeviceAu
 	return auth, err
 }
 
-// func main() {
-// 	scope := "user:email"
-// 	authResponse, err := requestDeviceAndUserCodes(githubEndpoint.DeviceAuthURL, clientID, scope)
-// 	if err != nil {
-// 		log.Fatalf(err.Error())
-// 	}
-// 	fmt.Printf(authResponse.DeviceCode)
-//
-// }
-
-// PROMPT USER TO ENTER USER CODE TO VERIFICATION URI
-
-// https://github.com/login/oauth/access_token client_id=REDACTED device_code=REDACTED grant_type=urn:ietf:params:oauth:grant-type:device_code
-// {
-//  "access_token": REDACTED,
-//  "token_type": "bearer",
-//  "scope": "user"
-// }
-
-// GET A THING
-// --auth-type=token --auth-"bearer:REDACTED" https://github.com/user/emails
-
 func openbrowser(url string) {
 	var err error
 
@@ -338,8 +364,6 @@ func openbrowser(url string) {
 	}
 
 }
-
-type releases []release
 
 // getReleases retrieves a slice of releases from the gitURL
 func getReleases(gURL *gitURL) (*releases, error) {
@@ -413,57 +437,4 @@ func createRelease(auth *UserAuth, gURL *gitURL, tag, tagMessage, commitish stri
 	fmt.Println("DEBUG: returned successfully from JSON unmarshalling")
 
 	return &newRelease, nil
-}
-
-type releaseClaim struct {
-	TagName         string `json:"tag_name"`
-	TargetCommitish string `json:"target_commitish,omitempty"`
-	Name            string `json:"name"`
-	Body            string `json:"body"`
-	Draft           bool   `json:"draft"`
-	Prerelease      bool   `json:"prerelease"`
-	raw             map[string]interface{}
-}
-
-type release struct {
-	TagName         *string `json:"tag_name,omitempty"`
-	TargetCommitish *string `json:"target_commitish,omitempty"`
-	Name            *string `json:"name,omitempty"`
-	Body            *string `json:"body,omitempty"`
-	Draft           *bool   `json:"draft,omitempty"`
-	Prerelease      *bool   `json:"prerelease,omitempty"`
-
-	ID          *int     `json:"id,omitempty"`
-	CreatedAt   *string  `json:"created_at,omitempty"`
-	PublishedAt *string  `json:"published_at,omitempty"`
-	URL         *string  `json:"url,omitempty"`
-	HTMLURL     *string  `json:"html_url,omitempty"`
-	AssetsURL   *string  `json:"asset_url,omitempty"`
-	Assets      []*asset `json:"assets,omitempty"`
-	UploadURL   *string  `json:"upload_url,omitempty"`
-	ZipballURL  *string  `json:"zipball_url,omitempty"`
-	TarballURL  *string  `json:"tarball_url,omitempty"`
-	Author      *user    `json:"author,omitempty"`
-	NodeID      *string  `json:"node_id,omitempty"`
-	raw         map[string]interface{}
-}
-
-type asset struct {
-	ID                 *int64  `json:"id,omitempty"`
-	URL                *string `json:"url,omitempty"`
-	Name               *string `json:"name,omitempty"`
-	Label              *string `json:"label,omitempty"`
-	State              *string `json:"state,omitempty"`
-	ContentType        *string `json:"content_type,omitempty"`
-	Size               *int    `json:"size,omitempty"`
-	DownloadCount      *int    `json:"download_count,omitempty"`
-	CreatedAt          *string `json:"created_at,omitempty"`
-	UpdatedAt          *string `json:"updated_at,omitempty"`
-	BrowserDownloadURL *string `json:"browser_download_url,omitempty"`
-	Uploader           *string `json:"uploader,omitempty"`
-	NodeID             *string `json:"node_id,omitempty"`
-	raw                map[string]interface{}
-}
-
-type user interface {
 }
