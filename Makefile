@@ -29,6 +29,7 @@ mod:
 	go mod tidy
 	@git diff --exit-code -- go.mod
 
+.PHONY: test
 test:
 	go test ${BUILDFLAGS} ./... -covermode=atomic -coverpkg=./...
 
