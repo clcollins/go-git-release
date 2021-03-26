@@ -236,7 +236,9 @@ func getAccessToken(req *http.Request) (*UserAuth, bool, error) {
 // response, and reads the response body to a byte slice
 func makeHTTPRequest(req *http.Request) ([]byte, error) {
 
-	fmt.Println("DEBUG: beginning 'makeHTTPRequest'")
+	if verbose {
+		fmt.Println("DEBUG: beginning 'makeHTTPRequest'")
+	}
 
 	// create a context and execute the http request
 	r, err := ctxhttp.Do(context.TODO(), nil, req)
@@ -244,20 +246,10 @@ func makeHTTPRequest(req *http.Request) ([]byte, error) {
 		return nil, err
 	}
 
-	fmt.Println("DEBUG: ctxhttp.Do called in 'makeHTTPRequest'")
-
-	// check to see if the initial device flow request succeded
-	// 422 is an unprocessable entity, anything else is unknown
-	if code := r.StatusCode; code == 404 {
-		return nil, fmt.Errorf("failed to authorize device: %s", r.Status)
-	}
 	if code := r.StatusCode; code != 200 {
 		return nil, fmt.Errorf(r.Status)
 	}
 
-	fmt.Println("DEBUG: r.StatusCode processed in 'makeHTTPRequest'")
-
-	fmt.Println("DEBUG: read response in 'makeHTTPRequest'")
 	// read the body of the returned request
 	body, err := ioutil.ReadAll(io.LimitReader(r.Body, 1<<20))
 	if err != nil {

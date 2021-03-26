@@ -146,6 +146,9 @@ func stripComments(s string) string {
 func createTag(repo *git.Repository) error {
 	// Get the repoConfig to find the username and email
 	repoConfig, err := repo.ConfigScoped(config.GlobalScope)
+	if err != nil {
+		return err
+	}
 
 	// Prompt for a tag annotation message if one was not provided
 	if tagMessage == "" {

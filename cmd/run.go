@@ -230,7 +230,7 @@ func run() error {
 		if verbose {
 			fmt.Printf("Checking out Tag %s\n", tagObj.Name)
 		}
-		repo, err = checkoutCommitish(repo, tagObj.Target)
+		_, err = checkoutCommitish(repo, tagObj.Target)
 		if err != nil {
 			return err
 		}
@@ -384,6 +384,8 @@ func checkoutCommitish(repo *git.Repository, commitish plumbing.Hash) (*git.Repo
 	if err != nil {
 		return repo, err
 	}
+
+	fmt.Printf("REF HASH: %s\n", ref.Hash())
 
 	tree, err := repo.Worktree()
 	if err != nil {

@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"encoding/json"
+
 	. "github.com/stretchr/testify/assert"
 	"gopkg.in/h2non/gock.v1"
 
@@ -41,13 +43,13 @@ func TestNewPostRequest(t *testing.T) {
 	params.Add("name", "Version 1.0 Release")
 	params.Add("draft", strconv.FormatBool(false))
 	headers := make(map[string]string)
-	headers["Authorization"] = fmt.Sprintf("bearer BEAR!RUN!")
+	headers["Authorization"] = "bearer abc123"
 
 	// Expected Results
 	expectedMethod := "POST"
 
 	expectedHeader := map[string][]string{
-		"Authorization": {"bearer BEAR!RUN!"},
+		"Authorization": {"bearer abc123"},
 		"Content-Type":  {"application/x-www-form-urlencoded"},
 		"Accept":        {"application/json"},
 	}
@@ -84,7 +86,6 @@ func TestGetAccessToken(t *testing.T) {
 	// incorrect_client_credentials
 	// incorrect_device_code
 	// access_denied
-	return
 }
 
 // TestMakeHTTPRequest mocks calling out an http requests to a real server
@@ -92,43 +93,102 @@ func TestGetAccessToken(t *testing.T) {
 func TestMakeHTTPRequest(t *testing.T) {
 	defer gock.Off()
 
-	gock.New("https://api.github.com").
-		MatchHeader("Content-Type", "^application/x-www-form-urlencoded$").
-		MatchHeader("Accept", "^application/json$").
-		Reply(200).
-		JSON(map[string]string{"foo": "bar"})
+	var tagName string = "v1.0"
+	var targetCommitish string = "968c07f04cddcabd95cbdc42f1ad0b99854395e3"
+	var name string = "Version 1.0"
 
+	httpTests := []struct {
+		name            string
+		reply           int
+		expected        string
+		inputJSON       map[string]string
+		expectedContent release
+	}{
+		{
+			name:     "Test 200 response 01",
+			reply:    200,
+			expected: "",
+			inputJSON: map[string]string{
+				"tag_name":         "v1.0",
+				"target_commitish": "968c07f04cddcabd95cbdc42f1ad0b99854395e3",
+				"name":             "Version 1.0",
+			},
+			expectedContent: release{
+				TagName:         &tagName,
+				TargetCommitish: &targetCommitish,
+				Name:            &name,
+			},
+		},
+		{
+			name:     "Test 404 response",
+			reply:    404,
+			expected: "404 Not Found",
+		},
+		{
+			name:     "Test 422 response",
+			reply:    422,
+			expected: "422 Unprocessable Entity",
+		},
+	}
+
+	gockMatchURL := "https://api.github.com/api/testendpoint"
 	endPointURL := "https://api.github.com/api/testendpoint"
+
 	params := url.Values{}
 
-	req, err := newGetRequest(endPointURL, params)
+	for _, testSpec := range httpTests {
+		t.Run(
+			testSpec.name,
+			func(t *testing.T) {
+				gock.New(gockMatchURL).
+					MatchHeader("Content-Type", "^application/x-www-form-urlencoded$").
+					MatchHeader("Accept", "^application/json$").
+					Reply(testSpec.reply).
+					JSON(testSpec.inputJSON)
 
-	_, err = makeHTTPRequest(req)
-	Nil(t, err)
+				req, err := newGetRequest(endPointURL, params)
+				Nil(t, err)
 
-	// Also test 404, 422, and 200 responses
-	return
+				body, err := makeHTTPRequest(req)
+				if testSpec.expected != "" {
+					Error(t, err)
+					Equal(t, testSpec.expected, err.Error())
+					False(t, json.Valid(body))
+				}
+
+				if testSpec.expected == "" {
+					Nil(t, err)
+					True(t, json.Valid(body))
+					var b = &release{}
+					err = json.Unmarshal(body, b)
+					fmt.Println(b)
+					Nil(t, err)
+					Equal(t, testSpec.expectedContent.TagName, b.TagName)
+					Equal(t, testSpec.expectedContent.TargetCommitish, b.TargetCommitish)
+					Equal(t, testSpec.expectedContent.Name, b.Name)
+
+				}
+
+			},
+		)
+	}
 }
 
 // TestPollForAccessToken mocks responses to requests asking for access tokens
 // (eg: checking that the user has approved the device auth), and the handling
 // of errors
 func TestPollForAccessToken(t *testing.T) {
-	return
 }
 
 // TestRequestDeviceAndUserCodes tests calls to Github to request device
 // auth codes
 func TestRequestDeviceAndUserCodes(t *testing.T) {
-	return
 }
 
 // TestGetReleases
 func TestGetReleases(t *testing.T) {
-	return
 }
 
 // TestCreateRelease
 func TestCreateRelease(t *testing.T) {
-	return
 }
