@@ -89,7 +89,7 @@ a single command. At the moment, a Makefile with a "build" target is required.`,
 			for i := range errs {
 				fmt.Println(i)
 			}
-			cmd.Help()
+			// cmd.Help()
 			os.Exit(1)
 		}
 
@@ -115,7 +115,7 @@ a single command. At the moment, a Makefile with a "build" target is required.`,
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
-		os.Exit(1)
+		os.Exit(2)
 	}
 }
 

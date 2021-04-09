@@ -17,6 +17,7 @@ limitations under the License.
 */
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -27,7 +28,6 @@ import (
 	"net/url"
 	"os/exec"
 	"runtime"
-	"strconv"
 	"strings"
 	"time"
 
@@ -162,19 +162,17 @@ func newGetRequest(url string, params url.Values) (*http.Request, error) {
 
 // newPostRequest creates an http.Request using the provided URL and parameters
 // and sets the Content-Type and Accept headers to values we can work with
-func newPostRequest(url string, params url.Values, headers ...map[string]string) (*http.Request, error) {
-	r, err := http.NewRequest("POST", url, strings.NewReader(params.Encode()))
+func newPostRequest(url string, data io.Reader, headers ...map[string]string) (*http.Request, error) {
+	r, err := http.NewRequest("POST", url, data)
 	if err != nil {
 		return nil, err
 	}
 
 	// content is submitted as x-www-form-urlencoded; accepted back as JSON
-	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	r.Header.Set("Content-Type", "application/x-www-form-urlencoded; param=value")
 
-	// TODO: test Github recommended Accept header
 	// Github recommended Accept header is: application/vnd.github.v3+json
-	// r.Header.Set("Accept", "application/vnd.github.v3+json")
-	r.Header.Set("Accept", "application/json")
+	r.Header.Set("Accept", "application/vnd.github.v3+json")
 
 	// set any additional headers passed into the function
 	// this seems like an ugly way to do this
@@ -235,9 +233,8 @@ func getAccessToken(req *http.Request) (*UserAuth, bool, error) {
 // make HTTPRequest takes an http.Request, executes the request, checks for a 200
 // response, and reads the response body to a byte slice
 func makeHTTPRequest(req *http.Request) ([]byte, error) {
-
 	if verbose {
-		fmt.Println("DEBUG: beginning 'makeHTTPRequest'")
+		noteInfo("Making HTTP Request")
 	}
 
 	// create a context and execute the http request
@@ -246,14 +243,15 @@ func makeHTTPRequest(req *http.Request) ([]byte, error) {
 		return nil, err
 	}
 
-	if code := r.StatusCode; code != 200 {
-		return nil, fmt.Errorf(r.Status)
-	}
-
 	// read the body of the returned request
 	body, err := ioutil.ReadAll(io.LimitReader(r.Body, 1<<20))
 	if err != nil {
 		return nil, err
+	}
+
+	// Return the error if we don't receive a 200 or a 201
+	if code := r.StatusCode; code != 200 && code != 201 {
+		return body, fmt.Errorf(r.Status)
 	}
 
 	return body, err
@@ -278,7 +276,7 @@ func pollForAccessToken(userAuthURL, clientID, deviceCode, grantType string, exp
 			return nil, errors.New("timeout reached")
 		case <-ticker:
 			// create an http.Request
-			req, err := newPostRequest(userAuthURL, params)
+			req, err := newPostRequest(userAuthURL, strings.NewReader(params.Encode()))
 			if err != nil {
 				return nil, err
 			}
@@ -288,7 +286,9 @@ func pollForAccessToken(userAuthURL, clientID, deviceCode, grantType string, exp
 			}
 			if err != nil {
 				if err.Error() == "slow_down" {
-					fmt.Printf("slow down; adding %v seconds to interval\n", auth.raw["interval"])
+					if verbose {
+						noteInfo(fmt.Sprintf("slow down; adding %v seconds to interval\n", auth.raw["interval"]))
+					}
 					interval = int(auth.raw["interval"].(float64)) + 1
 					ticker = time.Tick(time.Duration(interval)*time.Second + 1)
 					time.Sleep(time.Duration(interval))
@@ -313,7 +313,7 @@ func requestDeviceAndUserCodes(deviceAuthURL, clientID, scope string) (*DeviceAu
 	}
 
 	// create the HTTP request for the device authentication
-	req, err := newPostRequest(deviceAuthURL, params)
+	req, err := newPostRequest(deviceAuthURL, strings.NewReader(params.Encode()))
 	if err != nil {
 		return nil, err
 	}
@@ -387,46 +387,65 @@ func getReleases(gURL *gitURL) (*releases, error) {
 
 // createRelease accepts a release name, description, commit value, tag name, target_commitish
 func createRelease(auth *UserAuth, gURL *gitURL, tag, tagMessage, commitish string, draft, prerelease bool) (*release, error) {
+	var newRelease release
+
 	// TEMP RELEASES URL HERE; LEARN TO TEMPLATE AND USE githubEndpoint.ReleasesURL
 	releasesURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/releases", gURL.organization, gURL.repository)
 
 	headers := make(map[string]string)
-
-	params := url.Values{}
-	params.Add("tag_name", tag)
-	params.Add("name", "DEBUG TEST 1")
-	params.Add("body", tagMessage)
-	params.Add("draft", strconv.FormatBool(draft))
-	params.Add("prerelease", strconv.FormatBool(prerelease))
-
-	fmt.Printf("+%v\n", params)
-
 	headers["Authorization"] = fmt.Sprintf("%s %s", auth.TokenType, auth.AccessToken)
-	req, err := newPostRequest(releasesURL, url.Values{}, headers)
+
+	releaseRequest := &newReleaseRequest{
+		TagName:    tag,
+		Name:       tag,
+		Body:       tagMessage,
+		Draft:      draft,
+		Prerelease: prerelease,
+	}
+
+	if commitish != "" {
+		releaseRequest.TargetCommitish = commitish
+	}
+
+	data, err := json.Marshal(releaseRequest)
 	if err != nil {
 		return nil, err
 	}
 
-	fmt.Println("DEBUG: returned successfully from 'newPostRequest'")
+	req, err := newPostRequest(releasesURL, bytes.NewBuffer(data), headers)
+	if err != nil {
+		return nil, err
+	}
 
 	// make the request
-	body, err := makeHTTPRequest(req)
-	if err != nil {
-		return nil, err
-	}
+	// If there's an error here, wait until after trying to unmarshal the body from JSON
+	// so we might get an indication of the issue
+	body, requestErr := makeHTTPRequest(req)
 
-	fmt.Println("DEBUG: returned successfully from 'makeHTTPRequest'")
-
-	var newRelease release
 	if err := json.Unmarshal(body, &newRelease); err != nil {
 		return nil, err
 	}
+
 	// unmarshal the raw data
 	if err = json.Unmarshal(body, &newRelease.raw); err != nil {
 		return nil, err
 	}
 
-	fmt.Println("DEBUG: returned successfully from JSON unmarshalling")
+	if requestErr != nil {
+		if verbose {
+			noteErr(fmt.Sprintf("%s - %v", requestErr, &newRelease.raw))
+		}
+		return &newRelease, requestErr
+	}
 
 	return &newRelease, nil
+}
+
+type newReleaseRequest struct {
+	TagName         string `json:"tag_name,omitempty"`
+	TargetCommitish string `json:"target_commitish,omitempty"`
+	Name            string `json:"name,omitempty"`
+	Body            string `json:"body,omitempty"`
+	Draft           bool   `json:"draft,omitempty"`
+	Prerelease      bool   `json:"prerelease,omitempty"`
 }

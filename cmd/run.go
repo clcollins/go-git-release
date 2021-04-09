@@ -34,9 +34,17 @@ import (
 
 const scope = "repo"
 
-func note(msg string) {
+func noteInfo(msg string) {
+	note(msg, "info")
+}
+
+func noteErr(msg string) {
+	note(msg, "error")
+}
+
+func note(msg string, level string) {
 	if verbose {
-		fmt.Println(msg)
+		fmt.Printf("[%s] %s\n", strings.ToUpper(level), msg)
 	}
 }
 
@@ -166,7 +174,7 @@ func publicKey(keyname string) (*ssh.PublicKeys, error) {
 func run() error {
 	// parse the user-provided git url
 	if verbose {
-		fmt.Println("Parsing Git URL")
+		noteInfo("Parsing Git URL")
 	}
 	gURL, err := parseGitURL(repositoryURL)
 	if err != nil {
@@ -175,7 +183,7 @@ func run() error {
 
 	// Create a tempDir to clone into
 	if verbose {
-		fmt.Println("Creating temporary directory")
+		noteInfo("Creating temporary directory")
 	}
 	tempDir, err := createTempDir()
 	if err != nil {
@@ -188,7 +196,7 @@ func run() error {
 	// Clone the remote
 	// If there is a branch, check that branch out specifically
 	if verbose {
-		fmt.Printf("Cloning %s into %s\n", gURL.raw, tempDir)
+		noteInfo(fmt.Sprintf("Cloning %s into %s\n", gURL.raw, tempDir))
 	}
 	repo, err := cloneRepo(gURL.raw, tempDir, branch)
 	if err != nil {
@@ -196,7 +204,7 @@ func run() error {
 	}
 
 	if verbose {
-		fmt.Println("Validating cloned repository")
+		noteInfo("Validating cloned repository")
 	}
 	// TODO: Flesh out the validation here
 	errs := postCloneValidation()
@@ -228,7 +236,7 @@ func run() error {
 		// If proceed, then checkout the existing Tag target commiit
 		// No need to create a tag - already exists
 		if verbose {
-			fmt.Printf("Checking out Tag %s\n", tagObj.Name)
+			noteInfo(fmt.Sprintf("Checking out Tag %s\n", tagObj.Name))
 		}
 		_, err = checkoutCommitish(repo, tagObj.Target)
 		if err != nil {
@@ -282,7 +290,7 @@ func run() error {
 
 	// poll for auth status
 	if verbose {
-		fmt.Println("Polling for access token")
+		noteInfo("Polling for access token")
 	}
 	userAuthResponse, err := pollForAccessToken(
 		githubEndpoint.TokenURL,
@@ -299,7 +307,7 @@ func run() error {
 	// List releases (does one exist?)
 	// https://docs.github.com/en/free-pro-team@latest/rest/reference/repos#list-releases
 	if verbose {
-		fmt.Println("Getting existing releases")
+		noteInfo("Getting existing releases")
 	}
 	releases, err := getReleases(gURL)
 	if err != nil {
@@ -307,7 +315,7 @@ func run() error {
 	}
 
 	if verbose {
-		fmt.Println("Checking if release already exists")
+		noteInfo("Checking if release already exists")
 		for _, release := range *releases {
 			fmt.Printf("Found release: %s\n", *release.Name)
 			if tag == *release.Name {
@@ -319,7 +327,7 @@ func run() error {
 	// Create a Release
 	// https://docs.github.com/en/free-pro-team@latest/rest/reference/repos#create-a-release
 	if verbose {
-		fmt.Println("Creating release")
+		noteInfo("Creating release")
 	}
 	resp, err := createRelease(userAuthResponse, gURL, tag, tagMessage, "", false, false)
 	if err != nil {

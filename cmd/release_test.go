@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"encoding/json"
+	"strings"
 
 	. "github.com/stretchr/testify/assert"
 	"gopkg.in/h2non/gock.v1"
@@ -50,8 +51,8 @@ func TestNewPostRequest(t *testing.T) {
 
 	expectedHeader := map[string][]string{
 		"Authorization": {"bearer abc123"},
-		"Content-Type":  {"application/x-www-form-urlencoded"},
-		"Accept":        {"application/json"},
+		"Content-Type":  {"application/x-www-form-urlencoded; param=value"},
+		"Accept":        {"application/vnd.github.v3+json"},
 	}
 
 	expectedURL := &url.URL{
@@ -60,7 +61,7 @@ func TestNewPostRequest(t *testing.T) {
 		Path:   "/api/testendpoint",
 	}
 
-	req, err := newPostRequest(endPointURL, params, headers)
+	req, err := newPostRequest(endPointURL, strings.NewReader(params.Encode()), headers)
 	Nil(t, err)
 
 	Equal(t, expectedMethod, req.Method)
