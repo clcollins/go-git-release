@@ -1,3 +1,5 @@
+#This repository is archived and will no longer receive updates.
+
 # go-git-release
 
 A CLI tool to create a tag, build binary artifacts and create a Github release with a single command
